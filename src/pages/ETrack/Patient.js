@@ -3,7 +3,17 @@ import PatientModal from "./components/PatientModal";
 import { url, getLocalData } from "../../helper/help";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import './Manager.css';
+import "./Manager.css";
+import { useNavigate } from "react-router-dom";
+// import { submitEvaluation } from './components/Evaluation/EvaluationService';
+
+
+
+
+import {
+  EvaluationModal,
+  EvaluationResultsModal,
+} from "./components/Evaluation/EvaluationModal";
 
 const Patient = () => {
   const [open, setOpen] = useState(false);
@@ -15,11 +25,22 @@ const Patient = () => {
   const [movingDepartmentId, setMovingDepartmentId] = useState(null);
   const [newDepartments, setNewDepartments] = useState({});
   const [equipmentList, setEquipmentList] = useState([]);
-  const [isRefreshingCoordinators, setIsRefreshingCoordinators] = useState(false);
-  
+  const [isRefreshingCoordinators, setIsRefreshingCoordinators] =
+    useState(false);
+
   const currentUserRole = localStorage.getItem("empType");
   const [translators, setTranslators] = useState([]);
   const [translatorOptions, setTranslatorOptions] = useState([]);
+
+  // Add these state variables with your other useState declarations
+  const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
+  const [evaluationResultsModalOpen, setEvaluationResultsModalOpen] =
+    useState(false);
+  const [selectedRequestForEvaluation, setSelectedRequestForEvaluation] =
+    useState(null);
+  const [evaluationData, setEvaluationData] = useState(null);
+
+  const navigate = useNavigate();
 
   dayjs.extend(relativeTime);
 
@@ -40,28 +61,53 @@ const Patient = () => {
       currentTask: "Transporting Request 10001",
     },
   ];
-  
+
   const [escorts, setEscorts] = useState(initialEscorts);
+  const [SYSTEM_DATETIME, setSYSTEM_DATETIME] = useState(new Date().toISOString().slice(0, 19).replace('T', ' '));
+  const SYSTEM_USER_ID = getLocalData("id");
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSYSTEM_DATETIME(new Date().toISOString().slice(0, 19).replace('T', ' '));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleSubmitEvaluation = async (requestId, formData) => {
+    try {
+      const result = await submitEvaluation(requestId, formData);
+      // Show success message
+      console.log("Evaluation submitted successfully");
+      
+      // Update request status to "evaluated"
+      await updateRequestStatus(requestId, "evaluated");
+      
+      return result;
+    } catch (error) {
+      // Let the modal component handle the error display
+      throw error;
+    }
+  };
+
 
   // Fetch equipment data from API
   const fetchEquipment = useCallback(async () => {
     try {
       const token = getLocalData("token");
-      const response = await fetch(
-        url + "/api/ETrack/OnGetEquipment",
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: "Bearer " + token,
-          },
-        }
-      );
+      const response = await fetch(url + "/api/ETrack/OnGetEquipment", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: "Bearer " + token,
+        },
+      });
 
       if (response.ok) {
         const result = await response.json();
-        const equipmentData = typeof result === "string" ? JSON.parse(result) : result;
+        const equipmentData =
+          typeof result === "string" ? JSON.parse(result) : result;
         console.log("Equipment Data:", equipmentData);
         setEquipmentList(equipmentData);
       }
@@ -89,22 +135,23 @@ const Patient = () => {
 
       if (response.ok) {
         const result = await response.json();
-        const translatorData = typeof result === "string" ? JSON.parse(result) : result;
+        const translatorData =
+          typeof result === "string" ? JSON.parse(result) : result;
         console.log("Translator Options:", translatorData);
-        
-        // Set raw translator options data
+
+        // Store the raw API response data
         setTranslatorOptions(translatorData);
-        
-        // Directly convert the API data to the format needed for display
-        const formattedTranslators = translatorData.map(translator => ({
-          id: translator.eid,
+
+        // Format data for display
+        const formattedTranslators = translatorData.map((translator) => ({
+          id: translator.eid, // Store eid as id for easy reference
           name: translator.full_name,
           languages: translator.lang || "Unknown",
           extension: translator.tel || "*0000",
           status: translator.is_free === "1" ? "Available" : "Not Available",
-          hasPendingRequest: false
+          hasPendingRequest: false,
         }));
-        
+
         setTranslators(formattedTranslators);
       }
     } catch (error) {
@@ -117,29 +164,29 @@ const Patient = () => {
   const updateTranslatorAvailability = useCallback(
     (requestsData) => {
       const updatedTranslators = [...translators];
-      
+
       if (requestsData && requestsData.length > 0) {
         requestsData.forEach((request) => {
           if (
             request.staff_name &&
             (request.status.toLowerCase() === "pending" ||
-             request.status.toLowerCase() === "created")
+              request.status.toLowerCase() === "created")
           ) {
             const translatorIndex = updatedTranslators.findIndex(
               (t) => t.name === request.staff_name
             );
-            
+
             if (translatorIndex !== -1) {
               updatedTranslators[translatorIndex] = {
                 ...updatedTranslators[translatorIndex],
                 hasPendingRequest: true,
-                status: "Not Available"
+                status: "Not Available",
               };
             }
           }
         });
       }
-      
+
       setTranslators(updatedTranslators);
     },
     [translators]
@@ -149,13 +196,12 @@ const Patient = () => {
   const refreshEscortData = useCallback(async () => {
     try {
       setIsRefreshingCoordinators(true);
-      
+
       setEscorts([...initialEscorts]);
-      
+
       await fetchTranslatorOptions();
-      
+
       await fetchRequests();
-      
     } catch (error) {
       console.error("Error refreshing escort data:", error);
     } finally {
@@ -171,22 +217,29 @@ const Patient = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Update calculateHandlingTime function
   const calculateHandlingTime = (requestTimeStr, requestDateStr) => {
     if (!requestTimeStr || !requestDateStr) return "-";
 
     try {
       const [year, month, day] = requestDateStr.split("-").map(Number);
       const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
-      
-      const requestDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
-      const now = currentTime;
-      
-      const diffMs = now - requestDateTime;
-      
+
+      const requestDateTime = new Date(
+        year,
+        month - 1,
+        day,
+        hours,
+        minutes,
+        seconds
+      );
+      const currentDT = new Date(currentDateTime.replace(" ", "T")); // Use the provided datetime
+
+      const diffMs = currentDT - requestDateTime;
       const diffMinutes = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMinutes / 60);
       const remainingMinutes = diffMinutes % 60;
-      
+
       if (diffHours > 0) {
         return `${diffHours}h ${remainingMinutes}m`;
       } else {
@@ -204,12 +257,19 @@ const Patient = () => {
     try {
       const [year, month, day] = requestDateStr.split("-").map(Number);
       const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
-      
-      const requestDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
+
+      const requestDateTime = new Date(
+        year,
+        month - 1,
+        day,
+        hours,
+        minutes,
+        seconds
+      );
       const now = currentTime;
 
       const diffMs = now - requestDateTime;
-      
+
       return Math.floor(diffMs / (1000 * 60));
     } catch (error) {
       console.error("Error calculating handling time:", error);
@@ -217,25 +277,29 @@ const Patient = () => {
     }
   };
 
+
   const calculateAvgHandlingTime = () => {
     if (requests.length === 0) return "- mins";
-    
+
     let totalMinutes = 0;
     let countableRequests = 0;
-    
-    requests.forEach(request => {
+
+    requests.forEach((request) => {
       if (request.request_time && request.request_date) {
-        totalMinutes += calculateHandlingTimeInMinutes(request.request_time, request.request_date);
+        totalMinutes += calculateHandlingTimeInMinutes(
+          request.request_time,
+          request.request_date
+        );
         countableRequests++;
       }
     });
-    
+
     if (countableRequests === 0) return "- mins";
-    
+
     const avgMinutes = Math.round(totalMinutes / countableRequests);
     const hours = Math.floor(avgMinutes / 60);
     const minutes = avgMinutes % 60;
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m`;
     } else {
@@ -263,7 +327,7 @@ const Patient = () => {
         var resBody = JSON.parse(result);
         console.log(resBody);
         setRequests(resBody);
-        
+
         // Update translator availability based on requests if we have translators
         if (translators.length > 0) {
           updateTranslatorAvailability(resBody);
@@ -286,41 +350,215 @@ const Patient = () => {
     "After: Heart Clinic": "D003",
     "Anesthesiology Department": "D004",
     "BadalVeda Diving Medical Center": "D005",
-    "C.C.U.": "D006"
+    "C.C.U.": "D006",
+  };
+
+  const submitEvaluation = async (requestId, evaluationData) => {
+    try {
+      const token = getLocalData("token");
+      
+      // Find the staff ID from the request
+      const request = requests.find(r => r.request_id === requestId);
+      if (!request || !request.staff_id) {
+        throw new Error("Staff ID not found in request data");
+      }
+  
+      // Prepare evaluation payload with ALL required fields
+      const evaluationPayload = {
+        evaluator_id: SYSTEM_USER_ID, // Current user's login
+        employee_id: request.staff_id,
+        evaluation_date: SYSTEM_DATETIME.split(" ")[0], // YYYY-MM-DD
+        evaluation_period: SYSTEM_DATETIME.split(" ")[0].substring(0, 7), // YYYY-MM
+        status: "submitted",
+        comments: evaluationData.comments || "",
+        active: "1", // Required field that was missing
+        details: evaluationData.details.map(detail => {
+          // Find the actual criterion to get its name
+          const criterion = detail.criteria_name || 
+                           `เกณฑ์ที่ ${detail.criteria_id}`; // Fallback if name not provided
+          
+          return {
+            criteria_id: detail.criteria_id,
+            criteria_name: criterion, // Required field that was missing
+            score: detail.score,
+            comments: detail.comments || ""
+          };
+        })
+      };
+  
+      console.log("Submitting evaluation payload:", JSON.stringify(evaluationPayload));
+
+      // Submit evaluation
+      const evalResponse = await fetch(
+        `${url}/api/Evaluation/OnCreateEvaluation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(evaluationPayload),
+        }
+      );
+  
+      if (!evalResponse.ok) {
+        // Try to get more detailed error information
+        let errorMessage = `Failed to submit evaluation (${evalResponse.status})`;
+        try {
+          const errorResponse = await evalResponse.json();
+          errorMessage = errorResponse.message || errorResponse.title || errorMessage;
+          console.error("API error details:", errorResponse);
+        } catch (e) {
+          // If we can't parse the error JSON, stick with the default message
+        }
+        throw new Error(errorMessage);
+      }
+  
+      const result = await evalResponse.json();
+      return result;
+    } catch (error) {
+      console.error("Error submitting evaluation:", error);
+      throw error;
+    }
+  };
+  
+  const getEvaluationResults = async (requestId) => {
+    try {
+      const token = getLocalData("token");
+  
+      // Find the request to get the employee ID
+      const request = requests.find(r => r.request_id === requestId);
+      if (!request || !request.staff_id) {
+        throw new Error("Staff ID not found in request data");
+      }
+  
+      // Fetch evaluations for this employee
+      const response = await fetch(
+        `${url}/api/Evaluation/OnGetEmployeeEvaluations?employeeId=${request.staff_id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          }
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error(`Failed to fetch evaluations (${response.status})`);
+      }
+  
+      const evaluations = await response.json();
+      
+      // Find the most recent evaluation for this employee
+      // You might want to add more logic to match the specific evaluation
+      let latestEvaluation = null;
+      
+      if (evaluations && evaluations.length > 0) {
+        latestEvaluation = evaluations[0]; // Assuming they're sorted by date desc
+        
+        // Fetch the details for this evaluation
+        const detailsResponse = await fetch(
+          `${url}/api/Evaluation/OnGetEvaluationDetails/${latestEvaluation.evaluation_id}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            }
+          }
+        );
+        
+        if (detailsResponse.ok) {
+          const fullEvaluation = await detailsResponse.json();
+          setEvaluationData({
+            ...fullEvaluation.evaluation,
+            details: fullEvaluation.details,
+            requestId // Keep track of the request ID
+          });
+          return fullEvaluation;
+        }
+      }
+  
+      // If no real data exists, use mock data
+      if (!latestEvaluation) {
+        console.log("No evaluation found, using mock data");
+        const mockData = {
+          total_score: 80,
+          comments: "Service was excellent and timely.",
+          evaluation_date: SYSTEM_DATETIME.split(" ")[0],
+          requestId,
+          details: [
+            { criteria_id: 1, criteria_name: "คุณภาพงาน", score: 4, max_score: 5 },
+            { criteria_id: 2, criteria_name: "ปริมาณงาน", score: 5, max_score: 5 },
+            { criteria_id: 3, criteria_name: "การตรงต่อเวลา", score: 4, max_score: 5 },
+            { criteria_id: 7, criteria_name: "ความรับผิดชอบ", score: 5, max_score: 5 }
+          ]
+        };
+  
+        setEvaluationData(mockData);
+        return mockData;
+      }
+  
+      return latestEvaluation;
+    } catch (error) {
+      console.error("Error fetching evaluation results:", error);
+      throw error;
+    }
   };
 
   const submitPatientEscortRequest = async (formData) => {
     try {
       var token = getLocalData("token");
-  
+
       if (!formData.item || formData.item.length === 0) {
         alert("กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการ");
         return;
       }
-  
+
       const equipments = formData.item.map((itemId) => ({
         equipment_id: itemId,
-        qty: "1"
+        qty: "1",
       }));
-      
+
       // Check if department should be an ID instead of a string
-      const departmentId = departmentMapping[formData.department] || formData.department;
-  
+      const departmentId =
+        departmentMapping[formData.department] || formData.department;
+
+      // Get the selected escort's eid
+      let staffId = "";
+      if (formData.escort) {
+        // Find the escort in translatorOptions using their ID or name
+        const selectedEscort = translatorOptions.find(
+          (escort) =>
+            escort.eid === formData.escort ||
+            escort.full_name === formData.escort
+        );
+
+        // Use the eid if found, otherwise fallback to current user
+        staffId = selectedEscort ? selectedEscort.eid : currentUser;
+      } else {
+        staffId = currentUser;
+      }
+
       const requestData = {
         type: "patient_escort",
         patient_hn: formData.patient,
-        base_service_point_id: departmentId, // Ensure this is an ID if required
+        base_service_point_id: departmentId,
         detail: `Priority: ${formData.priority}`,
-        staff_id: currentUser, 
+        staff_id: staffId, // Use the eid retrieved from translatorOptions
         priority: formData.priority || "Normal",
         escort: formData.escort || "",
-        item: formData.item.join(","), // Ensure it's a proper format
+        item: formData.item.join(","),
         equipments: equipments,
-        req: "required_value" // Add this line
+        req: "required_value",
       };
-  
-      console.log("Sending Request Data:", JSON.stringify(requestData, null, 2));
-  
+
+      console.log(
+        "Sending Request Data:",
+        JSON.stringify(requestData, null, 2)
+      );
+
       const response = await fetch(url + "/api/ETrack/OnInsertRequest", {
         method: "POST",
         headers: {
@@ -330,10 +568,10 @@ const Patient = () => {
         },
         body: JSON.stringify(requestData),
       });
-  
+
       console.log("API Response Status:", response.status);
       let responseData;
-      
+
       try {
         responseData = await response.json();
         console.log("Response Data:", responseData);
@@ -342,10 +580,10 @@ const Patient = () => {
         alert("Error processing response from server.");
         return;
       }
-  
+
       if (!response.ok) {
         console.error("API Error Response:", responseData);
-  
+
         let errorMessage = "Unknown error occurred.";
         if (responseData?.message) {
           errorMessage = responseData.message;
@@ -356,13 +594,16 @@ const Patient = () => {
         } else if (responseData?.title) {
           errorMessage = responseData.title;
         }
-  
+
         alert("Failed to submit: " + errorMessage);
         return;
       }
-  
+
       if (responseData?.success) {
-        alert("Request submitted successfully! ID: " + (responseData.requestId || "N/A"));
+        alert(
+          "Request submitted successfully! ID: " +
+            (responseData.requestId || "N/A")
+        );
         fetchRequests();
         setOpen(false);
       } else {
@@ -374,31 +615,38 @@ const Patient = () => {
     }
   };
 
-const getEquipmentNameById = useCallback((equipmentId) => {
-  if (!equipmentId || !equipmentList || equipmentList.length === .0) {
-    return "-";
-  }
-  
-  const equipment = equipmentList.find(eq => eq.id.toString() === equipmentId.toString());
-  return equipment ? equipment.equipment_name : `Unknown (${equipmentId})`;
-}, [equipmentList]);
+  const getEquipmentNameById = useCallback(
+    (equipmentId) => {
+      if (!equipmentId || !equipmentList || equipmentList.length === 0.0) {
+        return "-";
+      }
 
-const formatItemDisplay = useCallback((itemString) => {
-  if (!itemString || itemString === "-") {
-    return "-";
-  }
-  
-  try {
+      const equipment = equipmentList.find(
+        (eq) => eq.id.toString() === equipmentId.toString()
+      );
+      return equipment ? equipment.equipment_name : `Unknown (${equipmentId})`;
+    },
+    [equipmentList]
+  );
 
-    const itemIds = itemString.split(',').map(item => item.trim());
+  const formatItemDisplay = useCallback(
+    (itemString) => {
+      if (!itemString || itemString === "-") {
+        return "-";
+      }
 
-    return itemIds.map(id => getEquipmentNameById(id)).join(', ');
-  } catch (error) {
-    console.error("Error formatting item display:", error);
-    return itemString; 
-  }
-}, [getEquipmentNameById]);
-  
+      try {
+        const itemIds = itemString.split(",").map((item) => item.trim());
+
+        return itemIds.map((id) => getEquipmentNameById(id)).join(", ");
+      } catch (error) {
+        console.error("Error formatting item display:", error);
+        return itemString;
+      }
+    },
+    [getEquipmentNameById]
+  );
+
   const handleSubmit = (event, formData) => {
     event.preventDefault();
     console.log("Submitting request:", formData);
@@ -492,7 +740,7 @@ const formatItemDisplay = useCallback((itemString) => {
           )
         );
         alert(`Request status updated to ${newStatus} successfully`);
-        
+
         fetchRequests();
       } else {
         const errorData = await response.json();
@@ -513,82 +761,103 @@ const formatItemDisplay = useCallback((itemString) => {
   const fetchDepartmentTrackerData = useCallback(async () => {
     try {
       const token = getLocalData("token");
-      const response = await fetch(url + "/api/ETrack/OnGetEtrackRequest?Type=patient_escort", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: "Bearer " + token,
-        },
-      });
-  
+      const response = await fetch(
+        url + "/api/ETrack/OnGetEtrackRequest?Type=patient_escort",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+
       if (response.ok) {
         const result = await response.json();
-        const dataArray = typeof result === "string" ? JSON.parse(result) : result;
-  
+        const dataArray =
+          typeof result === "string" ? JSON.parse(result) : result;
+
         const trackerData = dataArray.map((item) => {
-          const lastMovedDateTime = item.last_update ? new Date(item.last_update) : new Date(`${item.request_date}T${item.request_time}`);
+          const lastMovedDateTime = item.last_update
+            ? new Date(item.last_update)
+            : new Date(`${item.request_date}T${item.request_time}`);
           const now = new Date();
           const timeDiffMs = now - lastMovedDateTime;
           const timeInDeptMinutes = Math.floor(timeDiffMs / (1000 * 60));
-          
+
           const hours = Math.floor(timeInDeptMinutes / 60);
           const minutes = timeInDeptMinutes % 60;
           let timeInDeptFormatted = "Just arrived";
-  
+
           if (timeInDeptMinutes > 0) {
             if (hours > 0) {
-              timeInDeptFormatted = `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min${minutes !== 1 ? "s" : ""}`;
+              timeInDeptFormatted = `${hours} hr${
+                hours > 1 ? "s" : ""
+              } ${minutes} min${minutes !== 1 ? "s" : ""}`;
             } else {
               timeInDeptFormatted = `${minutes} min${minutes !== 1 ? "s" : ""}`;
             }
           }
-  
+
           return {
             id: item.request_id,
             role: "International Coordinator",
             name: item.staff_name || "Unknown",
             currentDept: item.base_service_point_id || "Unknown",
             timeInDept: timeInDeptFormatted,
-            lastMovedTime: lastMovedDateTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            lastMovedTime: lastMovedDateTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
             status: item.status,
           };
         });
-  
-        setDepartmentTrackers(trackerData.filter(tracker => tracker.status !== "cancelled" && tracker.status !== "finished" && tracker.status !== "completed"));
+
+        setDepartmentTrackers(
+          trackerData.filter(
+            (tracker) =>
+              tracker.status !== "cancelled" &&
+              tracker.status !== "finished" &&
+              tracker.status !== "completed"
+          )
+        );
       }
     } catch (error) {
       console.error("Error fetching department tracker data:", error);
     }
   }, []);
-  
+
   useEffect(() => {
     fetchRequests();
     fetchTranslatorOptions();
     fetchDepartmentTrackerData();
   }, [fetchTranslatorOptions, fetchDepartmentTrackerData]);
-    
+
   const handleDepartmentChange = (id, value) => {
     setNewDepartments((prev) => ({
       ...prev,
       [id]: value,
     }));
   };
-    
+
   const updateDepartment = async (id) => {
     if (!id || !newDepartments[id]) {
       alert("Please select a department");
       return;
     }
-      
-    const confirmUpdate = window.confirm("Are you sure you want to update the department?");
+
+    const confirmUpdate = window.confirm(
+      "Are you sure you want to update the department?"
+    );
     if (!confirmUpdate) {
-      return;  }
-      
+      return;
+    }
+
     try {
       setMovingDepartmentId(id);
       const token = getLocalData("token");
-  
+
       const response = await fetch(
         `${url}/api/ETrack/OnUpdateETrack?id=${id}`,
         {
@@ -603,7 +872,7 @@ const formatItemDisplay = useCallback((itemString) => {
           }),
         }
       );
-  
+
       if (response.ok) {
         // Update the local state
         setDepartmentTrackers((prev) =>
@@ -621,16 +890,16 @@ const formatItemDisplay = useCallback((itemString) => {
               : tracker
           )
         );
-  
+
         // Clear the selected department
         setNewDepartments((prev) => {
           const updated = { ...prev };
           delete updated[id];
           return updated;
         });
-  
+
         alert("Department updated successfully");
-  
+
         // Refresh the data
         fetchDepartmentTrackerData();
       } else {
@@ -643,7 +912,7 @@ const formatItemDisplay = useCallback((itemString) => {
       setMovingDepartmentId(null);
     }
   };
-      
+
   const handleEscortStatusChange = (escortName) => {
     setEscorts((prevEscorts) => {
       return prevEscorts.map((escort) => {
@@ -716,15 +985,18 @@ const formatItemDisplay = useCallback((itemString) => {
   const renderDepartmentTracker = () => {
     // ฟังก์ชันแปลงเวลาจากจำนวน minutes(นาที) เป็น "xxhr xxm"
     const formatTimeInDept = (minutes) => {
-      if (typeof minutes !== "number" || isNaN(minutes) || minutes === 0) return "00hr 00m";
-  
+      if (typeof minutes !== "number" || isNaN(minutes) || minutes === 0)
+        return "00hr 00m";
+
       const hours = Math.floor(minutes / 60); // คำนวณชั่วโมง
       const remainingMinutes = minutes % 60; // คำนวณนาทีที่เหลือ
-  
+
       // คืนค่าผลลัพธ์ในรูปแบบ "xxhr xxm"
-      return `${String(hours).padStart(2, '0')}hr ${String(remainingMinutes).padStart(2, '0')}m`;
+      return `${String(hours).padStart(2, "0")}hr ${String(
+        remainingMinutes
+      ).padStart(2, "0")}m`;
     };
-  
+
     return (
       <div className="dashboard-panel">
         <h3 className="panel-title">Department Tracker</h3>
@@ -738,7 +1010,7 @@ const formatItemDisplay = useCallback((itemString) => {
                 <th>Action</th>
               </tr>
             </thead>
-  
+
             <tbody>
               {departmentTrackers.length > 0 ? (
                 departmentTrackers.map((tracker) => (
@@ -747,12 +1019,14 @@ const formatItemDisplay = useCallback((itemString) => {
                     <td>{tracker.currentDept}</td>
                     {/* ใช้ฟังก์ชัน formatTimeInDept เพื่อแสดงเวลาในรูปแบบที่ต้องการ */}
                     <td>{tracker.timeInDept}</td>
-                     <td>
+                    <td>
                       <div className="select-action-group">
                         <select
                           id={`trackerDeptSelect-${tracker.id}`}
                           className="dashboard-select"
-                          onChange={(e) => handleDepartmentChange(tracker.id, e.target.value)}
+                          onChange={(e) =>
+                            handleDepartmentChange(tracker.id, e.target.value)
+                          }
                           value={newDepartments[tracker.id] || ""}
                         >
                           <option value="">Select Department</option>
@@ -761,17 +1035,26 @@ const formatItemDisplay = useCallback((itemString) => {
                           <option value="IVF">IVF</option>
                           <option value="OPD">OPD</option>
                           <option value="IPD">IPD</option>
-                          <option value="After: Checkup Contract">After: Checkup Contract</option>
+                          <option value="After: Checkup Contract">
+                            After: Checkup Contract
+                          </option>
                           <option value="After: Surgery">After: Surgery</option>
-                          <option value="After: Consultation">After: Consultation</option>
+                          <option value="After: Consultation">
+                            After: Consultation
+                          </option>
                         </select>
-  
+
                         <button
                           className="dashboard-btn btn-info"
                           onClick={() => updateDepartment(tracker.id)}
-                          disabled={movingDepartmentId === tracker.id || !newDepartments[tracker.id]}
+                          disabled={
+                            movingDepartmentId === tracker.id ||
+                            !newDepartments[tracker.id]
+                          }
                         >
-                          {movingDepartmentId === tracker.id ? "Processing..." : "Move Dept"}
+                          {movingDepartmentId === tracker.id
+                            ? "Processing..."
+                            : "Move Dept"}
                         </button>
                       </div>
                     </td>
@@ -790,7 +1073,7 @@ const formatItemDisplay = useCallback((itemString) => {
       </div>
     );
   };
-  
+
   // Calculate metrics for the dashboard
   const pendingRequests = requests.filter(
     (r) => r.status === "pending" || r.status === "created"
@@ -804,24 +1087,34 @@ const formatItemDisplay = useCallback((itemString) => {
       ? Math.round((completedRequests / totalRequests) * 100)
       : 0;
 
-      const sortedRequests = [...requests].sort((a, b) => {
-        // เรียงตาม request_id จากมากไปน้อย (หากเป็นตัวเลข)
-        return parseInt(b.request_id) - parseInt(a.request_id);
-      });
+  const sortedRequests = [...requests].sort((a, b) => {
+    // เรียงตาม request_id จากมากไปน้อย (หากเป็นตัวเลข)
+    return parseInt(b.request_id) - parseInt(a.request_id);
+  });
 
   // Updated to match provided user login and datetime
-  const currentUser = "test";
-  const currentDateTime = "2025-03-07 19:32:39";
+  const currentUser = localStorage.getItem("fullName");
+  const currentDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
   const renderActionButtons = (request) => {
     const isProcessing = processingId === request.request_id;
 
-    const showCancelButton = request.status !== "finished";
+    // Show cancel button for active requests
+    const showCancelButton =
+      request.status !== "finished" && request.status !== "evaluated";
 
+    // Show accept button for pending/created requests
     const showAcceptButton =
       request.status === "pending" || request.status === "created";
 
+    // Show finish button for accepted requests
     const showFinishButton = request.status === "accepted";
+
+    // Show evaluate button for finished requests
+    const showEvaluateButton = request.status === "finished";
+
+    // Show view results button for evaluated requests
+    const showResultsButton = request.status === "evaluated";
 
     return (
       <div className="action-buttons">
@@ -852,8 +1145,41 @@ const formatItemDisplay = useCallback((itemString) => {
             className="btn btn-primary"
             onClick={() => updateRequestStatus(request.request_id, "finished")}
             disabled={isProcessing}
+            style={{ marginRight: "5px" }}
           >
             {isProcessing ? "Processing..." : "Finish"}
+          </button>
+        )}
+
+        {showEvaluateButton && (
+          <button
+            className="btn btn-info"
+            onClick={() => {
+              setSelectedRequestForEvaluation(request);
+              setEvaluationModalOpen(true);
+            }}
+            disabled={isProcessing}
+            style={{ marginRight: "5px" }}
+          >
+            {isProcessing ? "Processing..." : "Evaluate Staff"}
+          </button>
+        )}
+
+        {showResultsButton && (
+          <button
+            className="btn btn-secondary"
+            onClick={async () => {
+              try {
+                const results = await getEvaluationResults(request.request_id);
+                setEvaluationData(results);
+                setEvaluationResultsModalOpen(true);
+              } catch (error) {
+                alert("Error fetching evaluation results: " + error.message);
+              }
+            }}
+            disabled={isProcessing}
+          >
+            {isProcessing ? "Processing..." : "View Evaluation"}
           </button>
         )}
       </div>
@@ -875,7 +1201,7 @@ const formatItemDisplay = useCallback((itemString) => {
             {isRefreshingCoordinators ? "Refreshing..." : "Refresh Data"}
           </button>
         </div> */}
-        
+
         <table className="tracking-table">
           {/* comment ไว้ก่อนเผื่อได้เอามาใช้ 
           <thead>
@@ -938,6 +1264,7 @@ const formatItemDisplay = useCallback((itemString) => {
             currentUser={currentUser}
             currentDateTime={currentDateTime}
             equipmentList={equipmentList}
+            translatorOptions={translatorOptions} // Add this line
           />
           {(currentUserRole === "manager" ||
             currentUserRole === "manager_patient" ||
@@ -1037,7 +1364,20 @@ const formatItemDisplay = useCallback((itemString) => {
           {renderDepartmentTracker()}
         </>
       )}
-      
+
+      <EvaluationModal
+        open={evaluationModalOpen}
+        handleClose={() => setEvaluationModalOpen(false)}
+        request={selectedRequestForEvaluation}
+        onSubmitEvaluation={handleSubmitEvaluation}
+        />
+
+      {/* Evaluation Results Modal */}
+      <EvaluationResultsModal
+        open={evaluationResultsModalOpen}
+        handleClose={() => setEvaluationResultsModalOpen(false)}
+        evaluationData={evaluationData}
+      />
     </div>
   );
 };

@@ -24,8 +24,9 @@ import {
 } from "recharts";
 import ChartContainer from "../ChartContainer";
 import HeatMapCalendar from "./HeatMapCalendar";
+import SuccessRateChart from "./SuccessRateChart";
 
-const CHART_COLORS = {
+export const CHART_COLORS = {
   primary: {
     escort: [
       "#004d40",
@@ -76,46 +77,7 @@ const CHART_COLORS = {
   },
 };
 
-// Custom tooltip component สำหรับ Success Rate Chart
-const SuccessRateTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div
-        className="custom-tooltip"
-        style={{
-          backgroundColor: "white",
-          padding: "10px 14px",
-          border: "1px solid #ccc",
-          borderRadius: "5px",
-          boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
-        }}
-      >
-        <p
-          className="tooltip-date"
-          style={{
-            margin: 0,
-            fontSize: "14px",
-            fontWeight: "bold",
-            marginBottom: "5px",
-          }}
-        >{`Date: ${label}`}</p>
-        <p
-          className="tooltip-rate"
-          style={{
-            margin: 0,
-            color:
-              Number(payload[0].value) >= 80
-                ? CHART_COLORS.success.main
-                : CHART_COLORS.neutral.dark,
-            fontSize: "16px",
-          }}
-        >{`Success Rate: ${payload[0].value}%`}</p>
-      </div>
-    );
-  }
-  return null;
-};
-
+// Custom tooltip component for Handling Time Chart
 const HandlingTimeTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -155,13 +117,43 @@ const HandlingTimeTooltip = ({ active, payload, label }) => {
   }
   return null;
 };
+
 // Format large numbers with commas
 const formatNumber = (num) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
+
 // Format percentage with one decimal place
 const formatPercent = (percent) => {
   return `${parseFloat(percent).toFixed(1)}%`;
+};
+
+// Helper component for ReferenceLine since it wasn't imported
+const ReferenceLine = ({ y, stroke, strokeDasharray, label }) => {
+  return (
+    <g>
+      <line
+        x1="0%"
+        x2="100%"
+        y1={y}
+        y2={y}
+        stroke={stroke}
+        strokeDasharray={strokeDasharray}
+        strokeWidth={1}
+      />
+      {label && (
+        <text
+          x="95%"
+          y={y - 5}
+          textAnchor="end"
+          fill={label.fill}
+          fontSize={label.fontSize}
+        >
+          {label.value}
+        </text>
+      )}
+    </g>
+  );
 };
 
 const ChartSection = ({
@@ -252,163 +244,257 @@ const ChartSection = ({
     });
 
    // Update the timeRanges colors in calculateHandlingTimeDistribution
-const timeRanges = [
-  { 
-    range: "0-5 min", 
-    count: 0, 
-    min: 0, 
-    max: 5, 
-    color: CHART_COLORS.accent.cyan, 
-    value: 5 
-  },
-  { range: "5-15 min", 
-    count: 0, 
-    min: 5, 
-    max: 15, 
-    color: CHART_COLORS.accent.blue, 
-    value: 15  },
+   const timeRanges = [
+    { 
+      range: "0-5 min", 
+      count: 0, 
+      min: 0, 
+      max: 5, 
+      color: CHART_COLORS.accent.cyan, 
+      value: 5 
+    },
+    { range: "5-15 min", 
+      count: 0, 
+      min: 5, 
+      max: 15, 
+      color: CHART_COLORS.accent.blue, 
+      value: 15  },
 
-  { range: "15-30 min", 
-    count: 0, 
-    min: 15, 
-    max: 30, 
-    color: CHART_COLORS.accent.indigo, 
-    value: 30 },
+    { range: "15-30 min", 
+      count: 0, 
+      min: 15, 
+      max: 30, 
+      color: CHART_COLORS.accent.indigo, 
+      value: 30 },
 
-  { range: "30-60 min", 
-    count: 0, 
-    min: 30, 
-    max: 60, 
-    color: CHART_COLORS.accent.purple, 
-    value: 60 },
+      { range: "30-60 min", 
+        count: 0, 
+        min: 30, 
+        max: 60, 
+        color: CHART_COLORS.accent.purple, 
+        value: 60 },
+      
+      { range: "1-2 hrs", 
+        count: 0, 
+        min: 60, 
+        max: 120, 
+        color: CHART_COLORS.accent.deepPurple, 
+        value: 120 },
+  
+      { range: "2+ hrs", 
+        count: 0, 
+        min: 120, 
+        max: Infinity, 
+        color: CHART_COLORS.accent.pink, 
+        value: 180 },
+    ];
+      // Count requests in each time range
+      handlingTimes.forEach((item) => {
+        const range = timeRanges.find(
+          (r) => item.minutes >= r.min && item.minutes < r.max
+        );
+        if (range) range.count++;
+      });
+  
+      // Calculate percentage for each range
+      const total = handlingTimes.length;
+      return timeRanges.map((range) => ({
+        ...range,
+        percentage: total > 0 ? ((range.count / total) * 100).toFixed(1) : 0,
+      }));
+    };
+  
+    // Calculate top departments with enhanced visualization
+    const calculateTopDepartments = (requests) => {
+      const deptCount = {};
+      let totalRequests = 0;
+  
+      requests.forEach((req) => {
+        if (!req.base_service_point_id) return;
+  
+        const dept = req.base_service_point_id;
+        deptCount[dept] = (deptCount[dept] || 0) + 1;
+        totalRequests++;
+      });
+  
+      const result = Object.keys(deptCount)
+        .map((dept, index) => ({ 
+          name: dept, 
+          count: deptCount[dept],
+          percentage: (deptCount[dept] / totalRequests * 100).toFixed(1),
+          color: CHART_COLORS.primary.translator[index % CHART_COLORS.primary.translator.length]
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+  
+      // Add ranking for better visualization
+      result.forEach((item, index) => {
+        item.rank = index + 1;
+      });
+  
+      return result;
+    };
+  
+    // Calculate success rate data for the appropriate request type
+    const successRateData = calculateSuccessRate(
+      selectedDataType === "patient_escort"
+        ? filteredRequests
+        : filteredCoordRequests
+    );
+  
+    // Calculate handling time distribution
+    const handlingTimeData = calculateHandlingTimeDistribution(
+      selectedDataType === "patient_escort"
+        ? filteredRequests
+        : filteredCoordRequests
+    );
+  
+    // Calculate top departments
+    const topDepartmentsData = calculateTopDepartments(
+      selectedDataType === "patient_escort"
+        ? filteredRequests
+        : filteredCoordRequests
+    );
+  
     
-  { range: "1-2 hrs", 
-    count: 0, 
-    min: 60, 
-    max: 120, 
-    color: CHART_COLORS.accent.deepPurple, 
-    value: 120 },
-
-  { range: "2+ hrs", 
-    count: 0, 
-    min: 120, 
-    max: Infinity, 
-    color: CHART_COLORS.accent.pink, 
-    value: 180 },
-];
-    // Count requests in each time range
-    handlingTimes.forEach((item) => {
-      const range = timeRanges.find(
-        (r) => item.minutes >= r.min && item.minutes < r.max
-      );
-      if (range) range.count++;
-    });
-
-    // Calculate percentage for each range
-    const total = handlingTimes.length;
-    return timeRanges.map((range) => ({
-      ...range,
-      percentage: total > 0 ? ((range.count / total) * 100).toFixed(1) : 0,
-    }));
-  };
-
-  // Calculate top departments with enhanced visualization
-  const calculateTopDepartments = (requests) => {
-    const deptCount = {};
-    let totalRequests = 0;
-
-    requests.forEach((req) => {
-      if (!req.base_service_point_id) return;
-
-      const dept = req.base_service_point_id;
-      deptCount[dept] = (deptCount[dept] || 0) + 1;
-      totalRequests++;
-    });
-
-const result = Object.keys(deptCount)
-  .map((dept, index) => ({ 
-    name: dept, 
-    count: deptCount[dept],
-    percentage: (deptCount[dept] / totalRequests * 100).toFixed(1),
-    color: CHART_COLORS.primary.translator[index % CHART_COLORS.primary.translator.length]
-  }))
-  .sort((a, b) => b.count - a.count)
-  .slice(0, 8);
-
-    // Add ranking for better visualization
-    result.forEach((item, index) => {
-      item.rank = index + 1;
-    });
-
-    return result;
-  };
-
-  // Calculate success rate data for the appropriate request type
-  const successRateData = calculateSuccessRate(
-    selectedDataType === "patient_escort"
-      ? filteredRequests
-      : filteredCoordRequests
-  );
-
-  // Calculate handling time distribution
-  const handlingTimeData = calculateHandlingTimeDistribution(
-    selectedDataType === "patient_escort"
-      ? filteredRequests
-      : filteredCoordRequests
-  );
-
-  // Calculate top departments
-  const topDepartmentsData = calculateTopDepartments(
-    selectedDataType === "patient_escort"
-      ? filteredRequests
-      : filteredCoordRequests
-  );
-
-  
-  // ประเภทของ chart ที่จะแสดง
-  if (selectedDataType === "patient_escort") {
-    return (
-      <div className="dashboard-charts grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
-  
-        {/* Department distribution for patient escorts */}
-        {visibleCharts.departmentDistribution && (
-          <ChartContainer title="Patient Escort Department Distribution">
-            <div className="chart-with-info">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={filteredDepartmentDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name}: ${formatPercent(percent * 100)}`
-                    }
-                    outerRadius={110}
-                    innerRadius={60}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                  >
-                    {filteredDepartmentDistribution.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={
-                          CHART_COLORS.accent[
-                            Object.keys(CHART_COLORS.accent)[
-                              index % Object.keys(CHART_COLORS.accent).length
+    // ประเภทของ chart ที่จะแสดง
+    if (selectedDataType === "patient_escort") {
+      return (
+        <div className="dashboard-charts grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+    
+          {/* Department distribution for patient escorts */}
+          {visibleCharts.departmentDistribution && (
+            <ChartContainer title="Patient Escort Department Distribution">
+              <div className="chart-with-info">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={filteredDepartmentDistribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        `${name}: ${formatPercent(percent * 100)}`
+                      }
+                      outerRadius={110}
+                      innerRadius={60}
+                      paddingAngle={2}
+                      dataKey="value"
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                    >
+                      {filteredDepartmentDistribution.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            CHART_COLORS.accent[
+                              Object.keys(CHART_COLORS.accent)[
+                                index % Object.keys(CHART_COLORS.accent).length
+                              ]
                             ]
-                          ]
-                        }
-                      />
+                          }
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name, props) => [
+                        formatPercent(value * 100),
+                        name,
+                      ]}
+                      contentStyle={{
+                        borderRadius: "5px",
+                        padding: "10px",
+                        backgroundColor: "rgba(255, 255, 255, 0.95)",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
+                        border: "1px solid #ddd",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div
+                  className="chart-timestamp"
+                  style={{
+                    textAlign: "right",
+                    fontSize: "12px",
+                    color: "#999",
+                    padding: "5px 10px",
+                  }}
+                >
+                  Data current as of {currentDateTime}
+                </div>
+              </div>
+            </ChartContainer>
+          )}
+  
+          {/* Top Departments - Improved */}
+          {visibleCharts.topDepartments && (
+            <ChartContainer title="Top Departments with Most Patient Escort Requests">
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart
+                  data={topDepartmentsData}
+                  layout="vertical"
+                  margin={{ top: 20, right: 30, left: 100, bottom: 20 }}
+                >
+                  <defs>
+                    {topDepartmentsData.map((entry, index) => (
+                      <linearGradient
+                        id={`departmentBarColor${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="1"
+                        y2="0"
+                        key={`gradient-dept-${index}`}
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor={entry.color}
+                          stopOpacity={0.9}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={entry.color}
+                          stopOpacity={0.6}
+                        />
+                      </linearGradient>
                     ))}
-                  </Pie>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#e0e0e0"
+                    horizontal={true}
+                    vertical={false}
+                  />
+                  <XAxis
+                    type="number"
+                    tick={{ fill: "#555", fontSize: 12 }}
+                    tickFormatter={formatNumber}
+                    label={{
+                      value: "Number of Requests",
+                      position: "insideBottom",
+                      offset: -10,
+                      style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
+                    }}
+                  />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    width={100}
+                    tick={{ fill: "#444", fontSize: 12 }}
+                    tickFormatter={(value) => {
+                      return value.length > 13
+                        ? `${value.substring(0, 12)}...`
+                        : value;
+                    }}
+                  />
                   <Tooltip
-                    formatter={(value, name, props) => [
-                      formatPercent(value * 100),
-                      name,
-                    ]}
+                    formatter={(value, name, props) => {
+                      return [
+                        `${formatNumber(value)} requests (${
+                          props.payload.percentage
+                        }%)`,
+                        props.payload.name,
+                      ];
+                    }}
                     contentStyle={{
                       borderRadius: "5px",
                       padding: "10px",
@@ -417,416 +503,216 @@ const result = Object.keys(deptCount)
                       border: "1px solid #ddd",
                     }}
                   />
-                </PieChart>
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    wrapperStyle={{ paddingBottom: 10 }}
+                  />
+                  <Bar
+                    dataKey="count"
+                    name="Number of Requests"
+                    radius={[0, 4, 4, 0]}
+                  >
+                    {topDepartmentsData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={`url(#departmentBarColor${index})`}
+                        stroke={entry.color}
+                        strokeWidth={1}
+                      />
+                    ))}
+                    <LabelList
+                      dataKey="count"
+                      position="right"
+                      style={{ fill: "#333", fontSize: "12px", fontWeight: 500 }}
+                      formatter={formatNumber}
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
               <div
-                className="chart-timestamp"
+                className="chart-ranking"
                 style={{
-                  textAlign: "right",
-                  fontSize: "12px",
-                  color: "#999",
-                  padding: "5px 10px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: "10px",
+                  fontSize: "13px",
                 }}
               >
-                Data current as of {currentDateTime}
+                <div style={{ color: "#666" }}>
+                  <strong>Data Analysis:</strong>{" "}
+                  {topDepartmentsData.length > 0
+                    ? `${
+                        topDepartmentsData[0].name
+                      } has the highest number of requests (${formatNumber(
+                        topDepartmentsData[0].count
+                      )})`
+                    : "No data available"}
+                </div>
+                <div style={{ color: "#999" }}>Updated: {currentDateTime}</div>
               </div>
-            </div>
-          </ChartContainer>
-        )}
-
-        {/* Top Departments - Improved */}
-        {visibleCharts.topDepartments && (
-          <ChartContainer title="Top Departments with Most Patient Escort Requests">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart
-                data={topDepartmentsData}
-                layout="vertical"
-                margin={{ top: 20, right: 30, left: 100, bottom: 20 }}
-              >
-                <defs>
-                  {topDepartmentsData.map((entry, index) => (
-                    <linearGradient
-                      id={`departmentBarColor${index}`}
-                      x1="0"
-                      y1="0"
-                      x2="1"
-                      y2="0"
-                      key={`gradient-dept-${index}`}
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor={entry.color}
-                        stopOpacity={0.9}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor={entry.color}
-                        stopOpacity={0.6}
-                      />
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e0e0e0"
-                  horizontal={true}
-                  vertical={false}
-                />
-                <XAxis
-                  type="number"
-                  tick={{ fill: "#555", fontSize: 12 }}
-                  tickFormatter={formatNumber}
-                  label={{
-                    value: "Number of Requests",
-                    position: "insideBottom",
-                    offset: -10,
-                    style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
-                  }}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  width={100}
-                  tick={{ fill: "#444", fontSize: 12 }}
-                  tickFormatter={(value) => {
-                    return value.length > 13
-                      ? `${value.substring(0, 12)}...`
-                      : value;
-                  }}
-                />
-                <Tooltip
-                  formatter={(value, name, props) => {
-                    return [
-                      `${formatNumber(value)} requests (${
-                        props.payload.percentage
-                      }%)`,
-                      props.payload.name,
-                    ];
-                  }}
-                  contentStyle={{
-                    borderRadius: "5px",
-                    padding: "10px",
-                    backgroundColor: "rgba(255, 255, 255, 0.95)",
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
-                    border: "1px solid #ddd",
-                  }}
-                />
-                <Legend
-                  verticalAlign="top"
-                  align="right"
-                  wrapperStyle={{ paddingBottom: 10 }}
-                />
-                <Bar
-                  dataKey="count"
-                  name="Number of Requests"
-                  radius={[0, 4, 4, 0]}
+            </ChartContainer>
+          )}
+  
+  
+          {/* Handling Time Distribution - Improved */}
+          {visibleCharts.handlingTimeDistribution && (
+            <ChartContainer title="Patient Escort Handling Time Distribution">
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart
+                  data={handlingTimeData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                 >
-                  {topDepartmentsData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={`url(#departmentBarColor${index})`}
+                  <defs>
+                    {handlingTimeData.map((entry, index) => (
+                      <linearGradient
+                        id={`gradient-${index}`}
+                        key={`gradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor={entry.color}
+                          stopOpacity={0.8} />
+                        <stop
+                          offset="100%"
+                          stopColor={entry.color}
+                          stopOpacity={0.3} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis dataKey="range" tick={{ fill: "#555", fontSize: 12 }} />
+                  <YAxis
+                    yAxisId="left"
+                    orientation="left"
+                    tick={{ fill: "#555", fontSize: 12 }}
+                    label={{
+                      value: "Request Count",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
+                    }} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    domain={[0, 100]}
+                    tick={{ fill: "#555", fontSize: 12 }}
+                    label={{
+                      value: "Percentage (%)",
+                      angle: 90,
+                      position: "insideRight",
+                      style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
+                    }}  />
+                  <Tooltip content={<HandlingTimeTooltip />} />
+                  <Legend wrapperStyle={{ paddingTop: 15 }} />
+  
+                  {/* Bars for counts with gradient fill */}
+                  {handlingTimeData.map((entry, index) => (
+                    <Bar
+                      key={`bar-${index}`}
+                      dataKey="count"
+                      name={entry.range}
+                      fill={`url(#gradient-${index})`}
+                      yAxisId="left"
+                      barSize={25}
+                      fillOpacity={0.9}
                       stroke={entry.color}
                       strokeWidth={1}
-                    />
+                      stackId="stack"
+                      radius={[4, 4, 0, 0]}
+                    >
+                      <LabelList
+                        dataKey="count"
+                        position="top"
+                        style={{
+                          fontSize: "11px",
+                          fill: "#333",
+                          fontWeight: 500,
+                        }}
+                      />
+                      {handlingTimeData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={`url(#gradient-${index})`}
+                        />
+                      ))}
+                    </Bar>
                   ))}
-                  <LabelList
-                    dataKey="count"
-                    position="right"
-                    style={{ fill: "#333", fontSize: "12px", fontWeight: 500 }}
-                    formatter={formatNumber}
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div
-              className="chart-ranking"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: "10px",
-                fontSize: "13px",
-              }}
-            >
-              <div style={{ color: "#666" }}>
-                <strong>Data Analysis:</strong>{" "}
-                {topDepartmentsData.length > 0
-                  ? `${
-                      topDepartmentsData[0].name
-                    } has the highest number of requests (${formatNumber(
-                      topDepartmentsData[0].count
-                    )})`
-                  : "No data available"}
+  
+                  {/* Line for percentage */}
+                  <Line
+                    type="monotone"
+                    dataKey="percentage"
+                    name="Percentage"
+                    stroke={CHART_COLORS.accent.purple}
+                    yAxisId="right"
+                    strokeWidth={2}
+                    dot={{
+                      stroke: CHART_COLORS.accent.purple,
+                      fill: "white",
+                      strokeWidth: 2,
+                      r: 4,
+                    }}
+                    activeDot={{
+                      r: 6,
+                      stroke: CHART_COLORS.accent.purple,
+                      strokeWidth: 2,
+                    }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+              <div
+                className="chart-caption"
+                style={{
+                  fontSize: "13px",
+                  textAlign: "center",
+                  color: "#666",
+                  marginTop: "10px",
+                  fontStyle: "italic",
+                }}
+              >
+                Distribution of request handling times across different time
+                ranges
               </div>
-              <div style={{ color: "#999" }}>Updated: {currentDateTime}</div>
-            </div>
-          </ChartContainer>
-        )}
-
-        {/* Success Rate Chart - Improved */}
-        {visibleCharts.successRate && (
-          <ChartContainer title="Patient Escort Success Rate">
+            </ChartContainer>
+          )}
+        </div>
+      );
+    }
+  
+    return (
+      <div className="dashboard-charts grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+      
+        {/* Language distribution chart for Translators - improved */}
+        {visibleCharts.languageDistribution && (
+          <ChartContainer title="Language Distribution">
             <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={successRateData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              >
+              <PieChart>
                 <defs>
-                  <linearGradient
-                    id="successRateGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="5%"
-                      stopColor={CHART_COLORS.success.accent}
-                      stopOpacity={0.8}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={CHART_COLORS.success.accent}
-                      stopOpacity={0.2}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis
-                  dataKey="date"
-                  angle={-45}
-                  textAnchor="end"
-                  height={70}
-                  tick={{ fill: "#555", fontSize: 12 }}
-                  tickMargin={10}/>
-                <YAxis
-                  label={{
-                    value: "Success Rate (%)",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
-                  }}
-                  domain={[0, 100]}
-                  ticks={[0, 20, 40, 60, 80, 100]}
-                  tick={{ fill: "#555", fontSize: 12 }} />
-                <Tooltip content={<SuccessRateTooltip />} />
-                <Legend
-                  wrapperStyle={{ paddingTop: 10 }}
-                  verticalAlign="top"
-                  align="right"/>
-                <Area
-                  type="monotone"
-                  dataKey="successRate"
-                  name="Success Rate Area"
-                  fill="url(#successRateGradient)"
-                  fillOpacity={0.4}
-                  stroke="none"/>
-                <Line
-                  type="monotone"
-                  dataKey="successRate"
-                  name="Success Rate"
-                  stroke={CHART_COLORS.success.dark}
-                  strokeWidth={3}
-                  dot={{
-                    stroke: CHART_COLORS.success.main,
-                    strokeWidth: 2,
-                    r: 5,
-                    fill: "white",
-                  }}
-                  activeDot={{
-                    r: 7,
-                    stroke: CHART_COLORS.success.dark,
-                    strokeWidth: 2,
-                  }} />
-
-                {/* Add a reference line at 80% - good performance threshold */}
-                <ReferenceLine
-                  y={80}
-                  stroke={CHART_COLORS.neutral.main}
-                  strokeDasharray="3 3"
-                  label={{
-                    position: "right",
-                    value: "Target (80%)",
-                    fill: CHART_COLORS.neutral.dark,
-                    fontSize: 12,
-                  }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-            <div
-              className="chart-timestamp"
-              style={{
-                textAlign: "right",
-                fontSize: "12px",
-                color: "#999",
-                marginTop: "5px",
-              }}
-            >
-              Data current as of {currentDateTime} • User: {currentUser}
-            </div>
-          </ChartContainer>
-        )}
-
-        {/* Handling Time Distribution - Improved */}
-        {visibleCharts.handlingTimeDistribution && (
-          <ChartContainer title="Patient Escort Handling Time Distribution">
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={handlingTimeData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
-              >
-                <defs>
-                  {handlingTimeData.map((entry, index) => (
+                  {filteredLanguageDistribution.map((entry, index) => (
                     <linearGradient
-                      id={`gradient-${index}`}
-                      key={`gradient-${index}`}
+                      id={`pieColor${index}`}
                       x1="0"
                       y1="0"
                       x2="0"
                       y2="1"
+                      key={`gradient-lang-${index}`}
                     >
                       <stop
                         offset="0%"
-                        stopColor={entry.color}
+                        stopColor={
+                          CHART_COLORS.primary.translator[
+                            index % CHART_COLORS.primary.translator.length ] }
                         stopOpacity={0.8} />
-                      <stop
-                        offset="100%"
-                        stopColor={entry.color}
-                        stopOpacity={0.3} />
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="range" tick={{ fill: "#555", fontSize: 12 }} />
-                <YAxis
-                  yAxisId="left"
-                  orientation="left"
-                  tick={{ fill: "#555", fontSize: 12 }}
-                  label={{
-                    value: "Request Count",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
-                  }} />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  domain={[0, 100]}
-                  tick={{ fill: "#555", fontSize: 12 }}
-                  label={{
-                    value: "Percentage (%)",
-                    angle: 90,
-                    position: "insideRight",
-                    style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
-                  }}  />
-                <Tooltip content={<HandlingTimeTooltip />} />
-                <Legend wrapperStyle={{ paddingTop: 15 }} />
-
-                {/* Bars for counts with gradient fill */}
-                {handlingTimeData.map((entry, index) => (
-                  <Bar
-                    key={`bar-${index}`}
-                    dataKey="count"
-                    name={entry.range}
-                    fill={`url(#gradient-${index})`}
-                    yAxisId="left"
-                    barSize={25}
-                    fillOpacity={0.9}
-                    stroke={entry.color}
-                    strokeWidth={1}
-                    stackId="stack"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    <LabelList
-                      dataKey="count"
-                      position="top"
-                      style={{
-                        fontSize: "11px",
-                        fill: "#333",
-                        fontWeight: 500,
-                      }}
-                    />
-                    {handlingTimeData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={`url(#gradient-${index})`}
-                      />
-                    ))}
-                  </Bar>
-                ))}
-
-                {/* Line for percentage */}
-                <Line
-                  type="monotone"
-                  dataKey="percentage"
-                  name="Percentage"
-                  stroke={CHART_COLORS.accent.purple}
-                  yAxisId="right"
-                  strokeWidth={2}
-                  dot={{
-                    stroke: CHART_COLORS.accent.purple,
-                    fill: "white",
-                    strokeWidth: 2,
-                    r: 4,
-                  }}
-                  activeDot={{
-                    r: 6,
-                    stroke: CHART_COLORS.accent.purple,
-                    strokeWidth: 2,
-                  }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-            <div
-              className="chart-caption"
-              style={{
-                fontSize: "13px",
-                textAlign: "center",
-                color: "#666",
-                marginTop: "10px",
-                fontStyle: "italic",
-              }}
-            >
-              Distribution of request handling times across different time
-              ranges
-            </div>
-          </ChartContainer>
-        )}
-
-
-
-      </div>
-    );
-  }
-
-  return (
-    <div className="dashboard-charts grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
-    
-      {/* Language distribution chart for Translators - improved */}
-      {visibleCharts.languageDistribution && (
-        <ChartContainer title="Language Distribution">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <defs>
-                {filteredLanguageDistribution.map((entry, index) => (
-                  <linearGradient
-                    id={`pieColor${index}`}
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                    key={`gradient-lang-${index}`}
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor={
-                        CHART_COLORS.primary.translator[
-                          index % CHART_COLORS.primary.translator.length ] }
-                      stopOpacity={0.8} />
-                    <stop
+                                         <stop
                       offset="100%"
                       stopColor={
                         CHART_COLORS.primary.translator[
                           index % CHART_COLORS.primary.translator.length ] }
                       stopOpacity={0.6} />
-
                   </linearGradient>
                 ))}
               </defs>
@@ -1013,107 +899,7 @@ const result = Object.keys(deptCount)
         </ChartContainer>
       )}
 
-      {/* Success Rate Chart - improved */}
-      {visibleCharts.successRate && (
-        <ChartContainer title="Translator Success Rate">
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart
-              data={successRateData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 50 }}
-            >
-              <defs>
-                <linearGradient
-                  id="translatorSuccessRateGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="5%"
-                    stopColor={CHART_COLORS.primary.translator[2]}
-                    stopOpacity={0.8} />
-                  <stop
-                    offset="95%"
-                    stopColor={CHART_COLORS.primary.translator[2]}
-                    stopOpacity={0.2} />
-                </linearGradient>
-              </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-              <XAxis
-                dataKey="date"
-                angle={-45}
-                textAnchor="end"
-                height={70}
-                tick={{ fill: "#555", fontSize: 12 }}
-                tickMargin={10} />
-              <YAxis
-                label={{
-                  value: "Success Rate (%)",
-                  angle: -90,
-                  position: "insideLeft",
-                  style: { textAnchor: "middle", fill: "#666", fontSize: 13 },
-                }}
-                domain={[0, 100]}
-                ticks={[0, 20, 40, 60, 80, 100]}
-                tick={{ fill: "#555", fontSize: 12 }}
-              />
-              <Tooltip content={<SuccessRateTooltip />} />
-              <Legend
-                wrapperStyle={{ paddingTop: 10 }}
-                verticalAlign="top"
-                align="right" />
-              <Area
-                type="monotone"
-                dataKey="successRate"
-                name="Success Rate Area"
-                fill="url(#translatorSuccessRateGradient)"
-                fillOpacity={0.4}
-                stroke="none" />
-              <Line
-                type="monotone"
-                dataKey="successRate"
-                name="Success Rate"
-                stroke={CHART_COLORS.primary.translator[1]}
-                strokeWidth={3}
-                dot={{
-                  stroke: CHART_COLORS.primary.translator[2],
-                  strokeWidth: 2,
-                  r: 5,
-                  fill: "white",
-                }}
-                activeDot={{
-                  r: 7,
-                  stroke: CHART_COLORS.primary.translator[0],
-                  strokeWidth: 2,
-                }} />
-              {/* Add a reference line at 80% - good performance threshold */}
-              <ReferenceLine
-                y={80}
-                stroke={CHART_COLORS.neutral.main}
-                strokeDasharray="3 3"
-                label={{
-                  position: "right",
-                  value: "Target (80%)",
-                  fill: CHART_COLORS.neutral.dark,
-                  fontSize: 12,
-                }} />
-            </ComposedChart>
-          </ResponsiveContainer>
-          <div
-            className="chart-timestamp"
-            style={{
-              textAlign: "right",
-              fontSize: "12px",
-              color: "#999",
-              marginTop: "5px",
-            }}
-          >
-            Data current as of {currentDateTime} • User: {currentUser}
-          </div>
-        </ChartContainer>
-      )}
 
       {/* Handling Time Distribution - improved */}
       {visibleCharts.handlingTimeDistribution && (
@@ -1232,36 +1018,7 @@ const result = Object.keys(deptCount)
           </div>
         </ChartContainer>
       )}
-
     </div>
-  );
-};
-
-// Helper component for ReferenceLine since it wasn't imported
-const ReferenceLine = ({ y, stroke, strokeDasharray, label }) => {
-  return (
-    <g>
-      <line
-        x1="0%"
-        x2="100%"
-        y1={y}
-        y2={y}
-        stroke={stroke}
-        strokeDasharray={strokeDasharray}
-        strokeWidth={1}
-      />
-      {label && (
-        <text
-          x="95%"
-          y={y - 5}
-          textAnchor="end"
-          fill={label.fill}
-          fontSize={label.fontSize}
-        >
-          {label.value}
-        </text>
-      )}
-    </g>
   );
 };
 

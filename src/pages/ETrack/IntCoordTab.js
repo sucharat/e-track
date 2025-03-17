@@ -318,12 +318,6 @@ const IntCoordTab = () => {
     }
   };
 
-  // This useEffect can be removed since we have the combined one above
-  // useEffect(() => {
-  //   fetchRequests();
-  //   fetchTranslatorOptions();
-  // }, [fetchTranslatorOptions]);
-
   const fetchRequestsData = useCallback(async () => {
     setLoading(true);
     try {
@@ -808,7 +802,7 @@ const IntCoordTab = () => {
   };
 
   const currentDateTime = "2025-03-06 07:37:37";
-  const currentLoginId = "TEST";
+  const currentLoginId = localStorage.getItem("fullName");
 
   return (
     <div id="intCoordSection">

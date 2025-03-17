@@ -71,6 +71,8 @@ function Login() {
   
       localStorage.setItem("empType", userData.empType);
       localStorage.setItem("fullName", userData.fullName);
+      localStorage.setItem("userId", userData.id);
+
   
       navigate("/e-track")
       

@@ -17,6 +17,10 @@ import SummarySection from "./components/Manager/SummarySection";
 import SystemStats from "./components/Manager/SystemStats";
 import DashboardFooter from "./components/Manager/DashboardFooter";
 import HeatMapCalendarContainer from "./components/Manager/HeatMapCalendarContainer";
+import SuccessRateChartContainer from "./components/Manager/SuccessRateChartContainer";
+import SuccessRateChart from "./components/Manager/SuccessRateChart";
+import { CHART_COLORS } from "./components/Manager/ChartSection";
+
 
 // Import utilities
 import {
@@ -50,6 +54,7 @@ const Manager = () => {
     endDate: "",
   });
 
+  
   // Core state for the application
   const [loading, setLoading] = useState(false);
 
@@ -139,6 +144,56 @@ const Manager = () => {
     { value: "patient_escort", label: "Patient Escort" },
     { value: "translator", label: "Translator/International Coordinator" },
   ];
+
+  // Add this function to the Manager.js file before the component definition
+
+// Function to calculate success rate data
+const calculateSuccessRate = (requests) => {
+  const requestsByDate = {};
+
+  requests.forEach((req) => {
+    if (!req.request_date) return;
+
+    const date = req.request_date;
+    if (!requestsByDate[date]) {
+      requestsByDate[date] = { total: 0, completed: 0 };
+    }
+    requestsByDate[date].total += 1;
+    if (req.status?.toLowerCase() === "finished") {
+      requestsByDate[date].completed += 1;
+    }
+  });
+
+  return Object.keys(requestsByDate)
+    .sort()
+    .map((date) => {
+      const completed = requestsByDate[date].completed;
+      const total = requestsByDate[date].total;
+      const rate = total > 0 ? (completed / total) * 100 : 0;
+
+      return {
+        date,
+        successRate: parseFloat(rate.toFixed(1)),
+        completed: completed,
+        total: total,
+        status:
+          rate >= 90
+            ? "Excellent"
+            : rate >= 80
+            ? "Good"
+            : rate >= 70
+            ? "Average"
+            : "Needs Improvement",
+      };
+    });
+};
+
+  const successRateData = calculateSuccessRate(
+    selectedDataType === "patient_escort"
+      ? filteredRequests
+      : filteredCoordRequests
+  );
+  
 
   const handleDateRangeChange = (newDateRange) => {
     setDateRange(newDateRange);
@@ -549,6 +604,8 @@ const Manager = () => {
         )}
       </div>
 
+      
+
       <Paper elevation={3} className="stats-container">
         <StatsDisplay
           selectedDataType={selectedDataType}
@@ -611,6 +668,25 @@ const Manager = () => {
             currentDateTime={currentDateTime} />
         </Grid>
       </Grid>
+
+{visibleCharts.successRate && (
+  <Grid container spacing={3}>
+    <Grid item xs={12}>
+      <SuccessRateChart
+        title={`${
+          selectedDataType === "patient_escort"
+            ? "Patient Escort"
+            : "Translator"
+        } Success Rate`}
+        data={successRateData}
+        chartColors={CHART_COLORS}  // Make sure to use the constant from your Manager.js
+        currentUser={currentUser}
+        currentDateTime={currentDateTime}
+        selectedDataType={selectedDataType}
+      />
+    </Grid>
+  </Grid>
+)}
 
       <SummarySection
         selectedDataType={selectedDataType}
