@@ -1,0 +1,18 @@
+
+
+.status-indicator.available {
+    color: green;
+  }
+  
+  .status-indicator.not-available {
+    color: red;
+  }
+  
+  .status-indicator.pending {
+    color: orange;
+  }
+  
+  .status-indicator.completed {
+    color: blue;
+  }
+  

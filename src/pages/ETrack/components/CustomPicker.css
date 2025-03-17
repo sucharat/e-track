@@ -1,0 +1,577 @@
+/* Enhanced CustomPicker.css - Updated for 2025-03-13 20:33:52 */
+/* Custom tooltip for time charts */
+.custom-tooltip {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.tooltip-time,
+.tooltip-date {
+  font-weight: bold;
+  margin: 0 0 5px 0;
+  color: #333;
+}
+.tooltip-count {
+  color: #555;
+  margin: 0;
+}
+/* SelectionDropdown styles */
+.selection-dropdown {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.selection-dropdown label {
+  margin-right: 0.5rem;
+  font-weight: bold;
+}
+.selection-dropdown select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  background-color: white;
+  min-width: 200px;
+  font-size: 1rem;
+}
+/* Enhanced DateRangePicker styles */
+.enhanced-date-range-picker {
+  position: relative;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin-bottom: 1rem;
+}
+.date-picker-toggle-btn {
+  min-width: 220px !important;
+  justify-content: flex-start !important;
+  text-transform: none !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-color: #d0d7de !important;
+}
+.date-filter-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 380px;
+  padding: 16px;
+  margin-top: 8px;
+  z-index: 100;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.filter-panel-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.filter-type-control {
+  width: 100%;
+  margin-bottom: 16px !important;
+}
+
+.filter-type-radio-group {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.filter-type-option {
+  margin-right: 0 !important;
+}
+
+.date-inputs-container {
+  margin-bottom: 16px;
+}
+
+.date-inputs {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.custom-inputs {
+  flex-direction: row;
+}
+
+.month-inputs, .year-inputs {
+  justify-content: center;
+}
+
+.date-input {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.date-input label {
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.date-input input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.month-input, .year-input {
+  width: 100%;
+  max-width: 220px;
+}
+
+.date-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e6ed;
+}
+
+.apply-btn {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  min-width: 100px;
+}
+
+.apply-btn:hover {
+  background-color: #45a049;
+}
+
+.apply-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background-color: #f8f9fa;
+  color: #495057;
+  border: 1px solid #ddd;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.cancel-btn:hover {
+  background-color: #e9ecef;
+}
+
+/* Legacy DateRangePicker styles (for backward compatibility) */
+.date-range-picker {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #eaeaea;
+}
+
+.filter-type-selector {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.filter-type-selector label {
+  margin-right: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.filter-type-selector input[type="radio"] {
+  margin-right: 0.5rem;
+}
+
+/* Dashboard controls */
+.dashboard-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.dashboard-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-controls-left,
+.dashboard-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Dashboard Section Title with Filter Badge */
+.dashboard-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-badge {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+/* Panel header with filter status */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-status {
+  display: flex;
+  align-items: center;
+}
+
+.current-filter {
+  font-size: 0.9rem;
+  color: #555;
+  background-color: #f0f8ff;
+  padding: 0.5rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.clear-filter-btn {
+  background-color: #ff6b6b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.clear-filter-btn:hover {
+  background-color: #ff5252;
+}
+
+/* Dashboard panel */
+.dashboard-panel {
+  padding: 1.5rem;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.data-timestamp {
+  text-align: right;
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-top: 0.5rem;
+}
+
+/* Enhanced chart styles */
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.chart-container {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  height: 100%;
+  min-height: 350px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Additional styles for the chart selector dropdown - append to your CustomPicker.css */
+
+.chart-visibility-selector {
+  position: relative;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.chart-selector-btn {
+  min-width: 180px !important;
+  justify-content: flex-start !important;
+  text-transform: none !important;
+  border-color: #d0d7de !important;
+}
+
+.chart-selector-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 300px;
+  padding: 16px;
+  margin-top: 8px;
+  z-index: 100;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.selector-panel-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.chart-options-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.chart-option-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.chart-option-label {
+  font-size: 14px;
+  color: #344767;
+}
+
+.chart-selector-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e6ed;
+}
+
+@media (max-width: 576px) {
+  .chart-selector-panel {
+    width: 100%;
+    min-width: 250px;
+    right: 0;
+  }
+}
+
+.chart-title {
+  font-size: 1.1rem;
+  color: #344767;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+/* Time-based charts specific styles */
+.time-chart-container {
+  height: 100%;
+  min-height: 400px;
+}
+
+/* Multi-stat container */
+.multi-stat-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #344767;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  color: #7b809a;
+  font-size: 0.85rem;
+}
+
+/* Response metrics */
+.response-metrics {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.response-metrics h3 {
+  font-size: 1rem;
+  color: #344767;
+  margin-bottom: 0.75rem;
+}
+
+.metrics-container {
+  display: flex;
+  justify-content: space-around;
+}
+
+.metric-item {
+  text-align: center;
+}
+
+.metric-label {
+  color: #7b809a;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #344767;
+}
+
+/* Custom footer */
+.dashboard-footer {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #eee;
+}
+
+.footer-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+/* MUI components custom styling */
+.MuiFormControl-root {
+  margin: 8px !important;
+}
+
+.MuiInputLabel-root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+.MuiChip-root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+.MuiMenuItem-root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .dashboard-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-controls {
+    flex-direction: column;
+  }
+  
+  .dashboard-controls > div {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  
+  .dashboard-controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .dashboard-controls-left,
+  .dashboard-controls-right {
+    width: 100%;
+  }
+  
+  .panel-header,
+  .dashboard-section-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .filter-status,
+  .filter-badge {
+    margin-top: 0.5rem;
+  }
+  
+  .metrics-container {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .footer-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .date-filter-panel {
+    width: 100%;
+    min-width: 280px;
+  }
+  
+  .date-inputs {
+    flex-direction: column;
+  }
+  
+  .filter-type-radio-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .filter-type-option {
+    margin-bottom: 8px;
+  }
+  
+  .filter-type-selector {
+    flex-direction: column;
+  }
+  
+  .filter-type-selector label {
+    margin-bottom: 0.5rem;
+  }
+  
+  .multi-stat-container {
+    grid-template-columns: 1fr;
+  }
+}
