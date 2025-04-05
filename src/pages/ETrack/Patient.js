@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import PatientModal from "./components/PatientModal";
 import { url, getLocalData } from "../../helper/help";
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "./Manager.css";
-import { useNavigate } from "react-router-dom";
 // import { submitEvaluation } from './components/Evaluation/EvaluationService';
-
-
-
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import ExportModal from "./components/Patient/ExportsModal";
+import * as XLSX from "xlsx";
 
 import {
   EvaluationModal,
@@ -21,54 +24,70 @@ const Patient = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [departmentTrackers, setDepartmentTrackers] = useState([]);
-  const [movingDepartmentId, setMovingDepartmentId] = useState(null);
+  const [, setDepartmentTrackers] = useState([]);
+  const [, setMovingDepartmentId] = useState(null);
   const [newDepartments, setNewDepartments] = useState({});
   const [equipmentList, setEquipmentList] = useState([]);
-  const [isRefreshingCoordinators, setIsRefreshingCoordinators] =
-    useState(false);
+  const [, setIsRefreshingCoordinators] = useState(false);
 
   const currentUserRole = localStorage.getItem("empType");
   const [translators, setTranslators] = useState([]);
   const [translatorOptions, setTranslatorOptions] = useState([]);
 
-  // Add these state variables with your other useState declarations
   const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
   const [evaluationResultsModalOpen, setEvaluationResultsModalOpen] =
     useState(false);
   const [selectedRequestForEvaluation, setSelectedRequestForEvaluation] =
     useState(null);
   const [evaluationData, setEvaluationData] = useState(null);
-
-  const navigate = useNavigate();
+  const [selectedDate, setSelectedDate] = useState(dayjs());
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   dayjs.extend(relativeTime);
 
+  useEffect(() => {
+    const dateTimer = setInterval(() => {
+      if (
+        selectedDate &&
+        dayjs().format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
+      ) {
+        setSelectedDate(dayjs());
+      }
+    }, 60000);
+    return () => clearInterval(dateTimer);
+  }, [selectedDate]);
+
   const initialEscorts = [
-    {
-      name: "นิคม วรรณเลิศอุดม",
-      status: "available",
-      currentTask: "None",
-    },
-    {
-      name: "วิศว กิจผ่องแผ้ว",
-      status: "occupied",
-      currentTask: "None",
-    },
-    {
-      name: "อภิชาติ เก้าเอี้ยน",
-      status: "ontheway",
-      currentTask: "Transporting Request 10001",
-    },
+    // {
+    //   name: "นิคม วรรณเลิศอุดม",
+    //   status: "available",
+    //   currentTask: "None",
+    // },
+    // {
+    //   name: "วิศว กิจผ่องแผ้ว",
+    //   status: "occupied",
+    //   currentTask: "None",
+    // },
+    // {
+    //   name: "อภิชาติ เก้าเอี้ยน",
+    //   status: "ontheway",
+    //   currentTask: "Transporting Request 10001",
+    // },
   ];
 
-  const [escorts, setEscorts] = useState(initialEscorts);
-  const [SYSTEM_DATETIME, setSYSTEM_DATETIME] = useState(new Date().toISOString().slice(0, 19).replace('T', ' '));
-  const SYSTEM_USER_ID = getLocalData("id");
+  const [, setEscorts] = useState(initialEscorts);
+  const [SYSTEM_DATETIME, setSYSTEM_DATETIME] = useState(
+    new Date().toISOString().slice(0, 19).replace("T", " ")
+  );
+  const SYSTEM_USER_ID = localStorage.getItem("userId");
+  console.log("SYSTEM_USER_ID:", SYSTEM_USER_ID);
+  const SYSTEM_USER_FULLNAME = localStorage.getItem("fullName");
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setSYSTEM_DATETIME(new Date().toISOString().slice(0, 19).replace('T', ' '));
+      setSYSTEM_DATETIME(
+        new Date().toISOString().slice(0, 19).replace("T", " ")
+      );
     }, 1000);
 
     return () => clearInterval(timer);
@@ -77,21 +96,17 @@ const Patient = () => {
   const handleSubmitEvaluation = async (requestId, formData) => {
     try {
       const result = await submitEvaluation(requestId, formData);
-      // Show success message
+
       console.log("Evaluation submitted successfully");
-      
-      // Update request status to "evaluated"
+
       await updateRequestStatus(requestId, "evaluated");
-      
-      return result;
-    } catch (error) {
-      // Let the modal component handle the error display
-      throw error;
+
+    return result;
+  } catch (error) {
+    throw error;
     }
   };
 
-
-  // Fetch equipment data from API
   const fetchEquipment = useCallback(async () => {
     try {
       const token = getLocalData("token");
@@ -116,7 +131,6 @@ const Patient = () => {
     }
   }, []);
 
-  // Fetch translator options from API
   const fetchTranslatorOptions = useCallback(async () => {
     try {
       setIsRefreshingCoordinators(true);
@@ -139,12 +153,10 @@ const Patient = () => {
           typeof result === "string" ? JSON.parse(result) : result;
         console.log("Translator Options:", translatorData);
 
-        // Store the raw API response data
         setTranslatorOptions(translatorData);
 
-        // Format data for display
         const formattedTranslators = translatorData.map((translator) => ({
-          id: translator.eid, // Store eid as id for easy reference
+          id: translator.eid,
           name: translator.full_name,
           languages: translator.lang || "Unknown",
           extension: translator.tel || "*0000",
@@ -192,23 +204,6 @@ const Patient = () => {
     [translators]
   );
 
-  // Refresh all escort data
-  const refreshEscortData = useCallback(async () => {
-    try {
-      setIsRefreshingCoordinators(true);
-
-      setEscorts([...initialEscorts]);
-
-      await fetchTranslatorOptions();
-
-      await fetchRequests();
-    } catch (error) {
-      console.error("Error refreshing escort data:", error);
-    } finally {
-      setIsRefreshingCoordinators(false);
-    }
-  }, [fetchTranslatorOptions, initialEscorts]);
-
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -217,8 +212,19 @@ const Patient = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Update calculateHandlingTime function
-  const calculateHandlingTime = (requestTimeStr, requestDateStr) => {
+  const filterRequestsByDate = useCallback((requests, filterDate) => {
+    if (!filterDate) return requests;
+
+    return requests.filter((request) => {
+      return request.request_date === filterDate.format("YYYY-MM-DD");
+    });
+  }, []);
+
+  const calculateHandlingTime = (
+    requestTimeStr,
+    requestDateStr,
+    lastFinishStr
+  ) => {
     if (!requestTimeStr || !requestDateStr) return "-";
 
     try {
@@ -233,9 +239,15 @@ const Patient = () => {
         minutes,
         seconds
       );
-      const currentDT = new Date(currentDateTime.replace(" ", "T")); // Use the provided datetime
 
-      const diffMs = currentDT - requestDateTime;
+      let endDateTime;
+      if (lastFinishStr) {
+        endDateTime = new Date(lastFinishStr.replace(" ", "T"));
+      } else {
+        endDateTime = new Date();
+      }
+
+      const diffMs = endDateTime - requestDateTime;
       const diffMinutes = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMinutes / 60);
       const remainingMinutes = diffMinutes % 60;
@@ -251,9 +263,12 @@ const Patient = () => {
     }
   };
 
-  const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr) => {
+  const calculateHandlingTimeInMinutes = (
+    requestTimeStr,
+    requestDateStr,
+    lastFinishStr
+  ) => {
     if (!requestTimeStr || !requestDateStr) return 0;
-
     try {
       const [year, month, day] = requestDateStr.split("-").map(Number);
       const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
@@ -266,17 +281,21 @@ const Patient = () => {
         minutes,
         seconds
       );
-      const now = currentTime;
 
-      const diffMs = now - requestDateTime;
+      let endDateTime;
+      if (lastFinishStr) {
+        endDateTime = new Date(lastFinishStr.replace(" ", "T"));
+      } else {
+        endDateTime = currentTime;
+      }
 
+      const diffMs = endDateTime - requestDateTime;
       return Math.floor(diffMs / (1000 * 60));
     } catch (error) {
-      console.error("Error calculating handling time:", error);
+      console.error("Error calculating handling time in minutes:", error);
       return 0;
     }
   };
-
 
   const calculateAvgHandlingTime = () => {
     if (requests.length === 0) return "- mins";
@@ -288,14 +307,14 @@ const Patient = () => {
       if (request.request_time && request.request_date) {
         totalMinutes += calculateHandlingTimeInMinutes(
           request.request_time,
-          request.request_date
+          request.request_date,
+          request.last_finish
         );
         countableRequests++;
       }
     });
 
     if (countableRequests === 0) return "- mins";
-
     const avgMinutes = Math.round(totalMinutes / countableRequests);
     const hours = Math.floor(avgMinutes / 60);
     const minutes = avgMinutes % 60;
@@ -307,6 +326,7 @@ const Patient = () => {
     }
   };
 
+  // In the fetchRequests function, modify it to filter requests based on user role
   const fetchRequests = async () => {
     try {
       var token = getLocalData("token");
@@ -326,10 +346,22 @@ const Patient = () => {
         const result = await response.json();
         var resBody = JSON.parse(result);
         console.log(resBody);
-        setRequests(resBody);
 
-        // Update translator availability based on requests if we have translators
-        if (translators.length > 0) {
+        // Filter requests if the current user is a patient_escort
+        if (currentUserRole === "patient_escort" && SYSTEM_USER_ID) {
+          // Filter requests to only show those assigned to the current escort
+          const filteredRequests = resBody.filter(
+            (request) =>
+              request.escort === SYSTEM_USER_ID ||
+              request.staff_id === SYSTEM_USER_ID
+          );
+          setRequests(filteredRequests);
+        } else {
+          // For other roles, show all requests
+          setRequests(resBody);
+        }
+
+      if (translators.length > 0) {
           updateTranslatorAvailability(resBody);
         }
       }
@@ -353,40 +385,50 @@ const Patient = () => {
     "C.C.U.": "D006",
   };
 
+  const refreshTranslatorData = async () => {
+    try {
+      await fetchTranslatorOptions();
+      return true;
+    } catch (error) {
+      console.error("Error refreshing translator data:", error);
+      return false;
+    }
+  };
+
   const submitEvaluation = async (requestId, evaluationData) => {
     try {
       const token = getLocalData("token");
-      
+
       // Find the staff ID from the request
-      const request = requests.find(r => r.request_id === requestId);
+      const request = requests.find((r) => r.request_id === requestId);
       if (!request || !request.staff_id) {
         throw new Error("Staff ID not found in request data");
       }
-  
-      // Prepare evaluation payload with ALL required fields
+
       const evaluationPayload = {
-        evaluator_id: SYSTEM_USER_ID, // Current user's login
+        evaluator_id: SYSTEM_USER_ID,
         employee_id: request.staff_id,
         evaluation_date: SYSTEM_DATETIME.split(" ")[0], // YYYY-MM-DD
         evaluation_period: SYSTEM_DATETIME.split(" ")[0].substring(0, 7), // YYYY-MM
         status: "submitted",
         comments: evaluationData.comments || "",
-        active: "1", // Required field that was missing
-        details: evaluationData.details.map(detail => {
-          // Find the actual criterion to get its name
-          const criterion = detail.criteria_name || 
-                           `เกณฑ์ที่ ${detail.criteria_id}`; // Fallback if name not provided
-          
+        active: "1",
+        request_id: requestId,
+        details: evaluationData.details.map((detail) => {
           return {
             criteria_id: detail.criteria_id,
-            criteria_name: criterion, // Required field that was missing
+            criteria_name:
+              detail.criteria_name || `เกณฑ์ที่ ${detail.criteria_id}`,
             score: detail.score,
-            comments: detail.comments || ""
+            comments: detail.comments || "",
           };
-        })
+        }),
       };
-  
-      console.log("Submitting evaluation payload:", JSON.stringify(evaluationPayload));
+
+      console.log(
+        "Submitting evaluation payload:",
+        JSON.stringify(evaluationPayload)
+      );
 
       // Submit evaluation
       const evalResponse = await fetch(
@@ -400,109 +442,74 @@ const Patient = () => {
           body: JSON.stringify(evaluationPayload),
         }
       );
-  
+
       if (!evalResponse.ok) {
-        // Try to get more detailed error information
         let errorMessage = `Failed to submit evaluation (${evalResponse.status})`;
         try {
           const errorResponse = await evalResponse.json();
-          errorMessage = errorResponse.message || errorResponse.title || errorMessage;
+          errorMessage =
+            errorResponse.message || errorResponse.title || errorMessage;
           console.error("API error details:", errorResponse);
         } catch (e) {
           // If we can't parse the error JSON, stick with the default message
         }
         throw new Error(errorMessage);
       }
-  
+
       const result = await evalResponse.json();
+        await updateRequestStatus(requestId, "evaluated");
+
       return result;
     } catch (error) {
       console.error("Error submitting evaluation:", error);
       throw error;
     }
   };
-  
+
   const getEvaluationResults = async (requestId) => {
     try {
       const token = getLocalData("token");
-  
-      // Find the request to get the employee ID
-      const request = requests.find(r => r.request_id === requestId);
-      if (!request || !request.staff_id) {
-        throw new Error("Staff ID not found in request data");
-      }
-  
-      // Fetch evaluations for this employee
+
+      console.log(`Fetching evaluation for request ID: ${requestId}`);
+
       const response = await fetch(
-        `${url}/api/Evaluation/OnGetEmployeeEvaluations?employeeId=${request.staff_id}`,
+        `${url}/api/Evaluation/OnGetEvaluationByRequestId/${requestId}`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
-          }
+          },
         }
       );
-  
+
+      console.log(`API response status: ${response.status}`);
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch evaluations (${response.status})`);
+        throw new Error(`Failed to fetch evaluation data: ${response.status}`);
       }
-  
-      const evaluations = await response.json();
-      
-      // Find the most recent evaluation for this employee
-      // You might want to add more logic to match the specific evaluation
-      let latestEvaluation = null;
-      
-      if (evaluations && evaluations.length > 0) {
-        latestEvaluation = evaluations[0]; // Assuming they're sorted by date desc
-        
-        // Fetch the details for this evaluation
-        const detailsResponse = await fetch(
-          `${url}/api/Evaluation/OnGetEvaluationDetails/${latestEvaluation.evaluation_id}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            }
-          }
-        );
-        
-        if (detailsResponse.ok) {
-          const fullEvaluation = await detailsResponse.json();
-          setEvaluationData({
-            ...fullEvaluation.evaluation,
-            details: fullEvaluation.details,
-            requestId // Keep track of the request ID
-          });
-          return fullEvaluation;
-        }
-      }
-  
-      // If no real data exists, use mock data
-      if (!latestEvaluation) {
-        console.log("No evaluation found, using mock data");
-        const mockData = {
-          total_score: 80,
-          comments: "Service was excellent and timely.",
-          evaluation_date: SYSTEM_DATETIME.split(" ")[0],
-          requestId,
-          details: [
-            { criteria_id: 1, criteria_name: "คุณภาพงาน", score: 4, max_score: 5 },
-            { criteria_id: 2, criteria_name: "ปริมาณงาน", score: 5, max_score: 5 },
-            { criteria_id: 3, criteria_name: "การตรงต่อเวลา", score: 4, max_score: 5 },
-            { criteria_id: 7, criteria_name: "ความรับผิดชอบ", score: 5, max_score: 5 }
-          ]
-        };
-  
-        setEvaluationData(mockData);
-        return mockData;
-      }
-  
-      return latestEvaluation;
+
+      // ดึงข้อมูลจาก response
+      const responseData = await response.json();
+      console.log("API response data:", responseData);
+
+      // เตรียมข้อมูลสำหรับแสดงผล
+      const evaluationResult = {
+        ...responseData.evaluation,
+        details: responseData.details || [],
+        requestId: requestId,
+      };
+
+      // บันทึกข้อมูลลงใน state
+      setEvaluationData(evaluationResult);
+      return evaluationResult;
     } catch (error) {
       console.error("Error fetching evaluation results:", error);
+      alert(
+        `ไม่สามารถดึงข้อมูลการประเมินได้: ${
+          error.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ"
+        }`
+      );
       throw error;
     }
   };
@@ -521,21 +528,16 @@ const Patient = () => {
         qty: "1",
       }));
 
-      // Check if department should be an ID instead of a string
       const departmentId =
         departmentMapping[formData.department] || formData.department;
-
-      // Get the selected escort's eid
       let staffId = "";
       if (formData.escort) {
-        // Find the escort in translatorOptions using their ID or name
         const selectedEscort = translatorOptions.find(
           (escort) =>
             escort.eid === formData.escort ||
             escort.full_name === formData.escort
         );
 
-        // Use the eid if found, otherwise fallback to current user
         staffId = selectedEscort ? selectedEscort.eid : currentUser;
       } else {
         staffId = currentUser;
@@ -546,7 +548,7 @@ const Patient = () => {
         patient_hn: formData.patient,
         base_service_point_id: departmentId,
         detail: `Priority: ${formData.priority}`,
-        staff_id: staffId, // Use the eid retrieved from translatorOptions
+        staff_id: staffId,
         priority: formData.priority || "Normal",
         escort: formData.escort || "",
         item: formData.item.join(","),
@@ -620,8 +622,7 @@ const Patient = () => {
       if (!equipmentId || !equipmentList || equipmentList.length === 0.0) {
         return "-";
       }
-
-      const equipment = equipmentList.find(
+    const equipment = equipmentList.find(
         (eq) => eq.id.toString() === equipmentId.toString()
       );
       return equipment ? equipment.equipment_name : `Unknown (${equipmentId})`;
@@ -703,7 +704,6 @@ const Patient = () => {
     }
   };
 
-  // Function to update the status of a request
   const updateRequestStatus = async (requestId, newStatus) => {
     if (!requestId) {
       console.error("Invalid request ID");
@@ -731,7 +731,6 @@ const Patient = () => {
       );
 
       if (response.ok) {
-        // Update local state to reflect the change without reloading
         setRequests(
           requests.map((request) =>
             request.request_id === requestId
@@ -873,8 +872,7 @@ const Patient = () => {
         }
       );
 
-      if (response.ok) {
-        // Update the local state
+       if (response.ok) {
         setDepartmentTrackers((prev) =>
           prev.map((tracker) =>
             tracker.id === id
@@ -891,16 +889,13 @@ const Patient = () => {
           )
         );
 
-        // Clear the selected department
-        setNewDepartments((prev) => {
+         setNewDepartments((prev) => {
           const updated = { ...prev };
           delete updated[id];
           return updated;
         });
+         alert("Department updated successfully");
 
-        alert("Department updated successfully");
-
-        // Refresh the data
         fetchDepartmentTrackerData();
       } else {
         alert("Failed to update department");
@@ -910,6 +905,83 @@ const Patient = () => {
       alert("Failed to update department: " + error.message);
     } finally {
       setMovingDepartmentId(null);
+    }
+  };
+
+  const handleExportData = async (startDate, endDate) => {
+    try {
+      const token = getLocalData("token");
+
+      // Format dates for API
+      const formattedStartDate = startDate.format("YYYY-MM-DD");
+      const formattedEndDate = endDate.format("YYYY-MM-DD");
+
+      console.log(
+        `Fetching data from ${formattedStartDate} to ${formattedEndDate}`
+      );
+
+      // สำหรับการทดสอบ ถ้า API ไม่รองรับการกรองวันที่ เราจะดึงทั้งหมดแล้วกรองเอง
+      const response = await fetch(
+        `${url}/api/ETrack/OnGetEtrackRequest?Type=patient_escort`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data: ${response.status}`);
+      }
+
+      const result = await response.json();
+      let data = typeof result === "string" ? JSON.parse(result) : result;
+
+      // กรองตามวันที่ด้วยตัวเอง (ในกรณีที่ API ไม่รองรับพารามิเตอร์ startDate และ endDate)
+      data = data.filter((item) => {
+        const requestDate = item.request_date;
+        return (
+          requestDate >= formattedStartDate && requestDate <= formattedEndDate
+        );
+      });
+
+      console.log(`Filtered data count: ${data.length}`);
+
+      // เพิ่มข้อมูล equipment จาก equipmentList
+      const enhancedData = data.map((request) => {
+        // ถ้ามี item ให้แปลง item เป็นชื่อ equipment
+        if (request.item) {
+          const itemIds = request.item.split(",").map((id) => id.trim());
+          const equipmentNames = itemIds.map((id) => {
+            const equipment = equipmentList.find(
+              (eq) => eq.id.toString() === id.toString()
+            );
+            return equipment ? equipment.equipment_name : `Unknown (${id})`;
+          });
+          request.equipment_name = equipmentNames.join(", ");
+        } else {
+          request.equipment_name = "ไม่ระบุ (Not Specified)";
+        }
+
+        return request;
+      });
+
+      // If the current user is a patient_escort, filter the data
+      if (currentUserRole === "patient_escort" && SYSTEM_USER_ID) {
+        return enhancedData.filter(
+          (request) =>
+            request.escort === SYSTEM_USER_ID ||
+            request.staff_id === SYSTEM_USER_ID
+        );
+      }
+
+      return enhancedData;
+    } catch (error) {
+      console.error("Error fetching export data:", error);
+      throw error;
     }
   };
 
@@ -946,132 +1018,14 @@ const Patient = () => {
     });
   };
 
-  const getActionButton = (status, name) => {
-    switch (status) {
-      case "available":
-        return (
-          <button
-            className="btn btn-primary"
-            onClick={() => handleEscortStatusChange(name)}
-          >
-            Assign Task
-          </button>
-        );
-
-      case "ontheway":
-        return (
-          <button
-            className="btn btn-warning"
-            onClick={() => handleEscortStatusChange(name)}
-          >
-            Arrived
-          </button>
-        );
-
-      case "occupied":
-        return (
-          <button
-            className="btn btn-success"
-            onClick={() => handleEscortStatusChange(name)}
-          >
-            Release
-          </button>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderDepartmentTracker = () => {
-    // ฟังก์ชันแปลงเวลาจากจำนวน minutes(นาที) เป็น "xxhr xxm"
-    const formatTimeInDept = (minutes) => {
-      if (typeof minutes !== "number" || isNaN(minutes) || minutes === 0)
-        return "00hr 00m";
-
-      const hours = Math.floor(minutes / 60); // คำนวณชั่วโมง
-      const remainingMinutes = minutes % 60; // คำนวณนาทีที่เหลือ
-
-      // คืนค่าผลลัพธ์ในรูปแบบ "xxhr xxm"
-      return `${String(hours).padStart(2, "0")}hr ${String(
-        remainingMinutes
-      ).padStart(2, "0")}m`;
-    };
-
-    return (
-      <div className="dashboard-panel">
-        <h3 className="panel-title">Department Tracker</h3>
-        <div className="table-responsive">
-          <table className="dashboard-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Current Department</th>
-                <th>Arrival Time</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {departmentTrackers.length > 0 ? (
-                departmentTrackers.map((tracker) => (
-                  <tr key={tracker.id}>
-                    <td>{tracker.name}</td>
-                    <td>{tracker.currentDept}</td>
-                    {/* ใช้ฟังก์ชัน formatTimeInDept เพื่อแสดงเวลาในรูปแบบที่ต้องการ */}
-                    <td>{tracker.timeInDept}</td>
-                    <td>
-                      <div className="select-action-group">
-                        <select
-                          id={`trackerDeptSelect-${tracker.id}`}
-                          className="dashboard-select"
-                          onChange={(e) =>
-                            handleDepartmentChange(tracker.id, e.target.value)
-                          }
-                          value={newDepartments[tracker.id] || ""}
-                        >
-                          <option value="">Select Department</option>
-                          <option value="ER">ER</option>
-                          <option value="ICU">ICU</option>
-                          <option value="IVF">IVF</option>
-                          <option value="OPD">OPD</option>
-                          <option value="IPD">IPD</option>
-                          <option value="After: Checkup Contract">
-                            After: Checkup Contract
-                          </option>
-                          <option value="After: Surgery">After: Surgery</option>
-                          <option value="After: Consultation">
-                            After: Consultation
-                          </option>
-                        </select>
-
-                        <button
-                          className="dashboard-btn btn-info"
-                          onClick={() => updateDepartment(tracker.id)}
-                          disabled={
-                            movingDepartmentId === tracker.id ||
-                            !newDepartments[tracker.id]
-                          }
-                        >
-                          {movingDepartmentId === tracker.id
-                            ? "Processing..."
-                            : "Move Dept"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" style={{ textAlign: "center" }}>
-                    No active department trackers found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
+  const hasPermissionToViewRequestorColumns = () => {
+    const allowedRoles = [
+      "manager",
+      "manager_patient",
+      "manager_translator",
+      "admin",
+    ];
+    return allowedRoles.includes(currentUserRole);
   };
 
   // Calculate metrics for the dashboard
@@ -1087,34 +1041,38 @@ const Patient = () => {
       ? Math.round((completedRequests / totalRequests) * 100)
       : 0;
 
-  const sortedRequests = [...requests].sort((a, b) => {
-    // เรียงตาม request_id จากมากไปน้อย (หากเป็นตัวเลข)
+    const sortedRequests = [...requests].sort((a, b) => {
     return parseInt(b.request_id) - parseInt(a.request_id);
   });
+    const currentUser = localStorage.getItem("fullName");
+  const currentDateTime = new Date()
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
 
-  // Updated to match provided user login and datetime
-  const currentUser = localStorage.getItem("fullName");
-  const currentDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
-
+  // Replace the renderActionButtons function with this updated version
   const renderActionButtons = (request) => {
     const isProcessing = processingId === request.request_id;
 
-    // Show cancel button for active requests
     const showCancelButton =
       request.status !== "finished" && request.status !== "evaluated";
 
-    // Show accept button for pending/created requests
     const showAcceptButton =
       request.status === "pending" || request.status === "created";
 
-    // Show finish button for accepted requests
     const showFinishButton = request.status === "accepted";
 
-    // Show evaluate button for finished requests
-    const showEvaluateButton = request.status === "finished";
+    const showEvaluateButton =
+      request.status === "finished" &&
+      (currentUserRole === "manager" ||
+        currentUserRole === "admin" ||
+        currentUserRole === "manager_patient");
 
-    // Show view results button for evaluated requests
-    const showResultsButton = request.status === "evaluated";
+    const showResultsButton =
+      request.status === "evaluated" &&
+      (currentUserRole === "manager" ||
+        currentUserRole === "admin" ||
+        currentUserRole === "manager_patient");
 
     return (
       <div className="action-buttons">
@@ -1186,65 +1144,7 @@ const Patient = () => {
     );
   };
 
-  // Render Live Escort Tracking with refresh button
-  const renderLiveEscortTracking = () => {
-    return (
-      <div className="request-panel">
-        {/* comment ไว้ก่อนเผื่อได้เอามาใช้
-        <div className="panel-header">
-          <h2>Live Escort Tracking</h2>
-          <button 
-            className="btn btn-refresh" 
-            onClick={refreshEscortData}
-            disabled={isRefreshingCoordinators}
-          >
-            {isRefreshingCoordinators ? "Refreshing..." : "Refresh Data"}
-          </button>
-        </div> */}
-
-        <table className="tracking-table">
-          {/* comment ไว้ก่อนเผื่อได้เอามาใช้ 
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Extension</th>
-              <th>Status</th>
-            </tr>
-          </thead> */}
-          <tbody>
-            {/* comment ไว้ก่อนเผื่อได้เอามาใช้
-            {translators.map((translator) => (
-              <tr key={translator.id || translator.name}>
-                <td>{translator.name}</td>
-                <td>{translator.extension}</td>
-                <td>
-                  <span
-                    className={`status-indicator ${
-                      translator.status === "Available"
-                        ? "available"
-                        : "not-available"
-                    }`}
-                  >
-                    {translator.status}
-                  </span>
-                </td>
-              </tr>
-            ))} */}
-
-            {translators.length === 0 && (
-              <tr>
-                <td colSpan="3" style={{ textAlign: "center" }}>
-                  No coordinators available
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
-  return (
+ return (
     <div id="patientEscortSection">
       <div className="header">
         <div className="title">E-TRACK | My Escort Requests</div>
@@ -1264,12 +1164,28 @@ const Patient = () => {
             currentUser={currentUser}
             currentDateTime={currentDateTime}
             equipmentList={equipmentList}
-            translatorOptions={translatorOptions} // Add this line
+            translatorOptions={translatorOptions}
+            escortRequests={requests}
+            onRefreshData={refreshTranslatorData}
           />
           {(currentUserRole === "manager" ||
             currentUserRole === "manager_patient" ||
             currentUserRole === "user") && (
-            <button className="btn btn-export">Export My Data</button>
+            <button
+              className="btn btn-export"
+              onClick={() => setExportModalOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
+                color: "white",
+                boxShadow: "0 3px 5px 2px rgba(33, 203, 243, .3)",
+              }}
+            >
+              <i className="fas fa-file-export"></i>
+              Export Data
+            </button>
           )}
         </div>
       </div>
@@ -1304,81 +1220,147 @@ const Patient = () => {
         </div>
       )}
 
+      {/* ตาราง My Requests */}
       <div className="request-panel">
-        <h2>My Requests</h2>
+        <div className="request-header">
+          <h2>My Requests</h2>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <DatePicker
+                label="Filter by date"
+                value={selectedDate}
+                onChange={(newDate) => setSelectedDate(newDate)}
+                renderInput={(props) => <TextField {...props} size="small" />}
+                slotProps={{
+                  textField: {
+                    size: "small",
+                    sx: { width: "200px" },
+                  },
+                }}
+              />
+            </Box>
+          </LocalizationProvider>
+        </div>
+
         {isLoading && !processingId ? (
           <div className="loading">Loading requests...</div>
         ) : requests.length === 0 ? (
           <div className="no-data">No requests found</div>
         ) : (
-          <table className="tracking-table">
-            <thead>
-              <tr>
-                <th>Request ID</th>
-                <th>Patient Name</th>
-                <th>Department</th>
-                <th>Priority</th>
-                <th>Escort</th>
-                <th>Handling Time</th>
-                <th>Item</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+          Object.entries(
+            // Apply the date filter before grouping
+            filterRequestsByDate(sortedRequests, selectedDate).reduce(
+              (groups, request) => {
+                const date = request.request_date;
+                if (!groups[date]) {
+                  groups[date] = [];
+                }
+                groups[date].push(request);
+                return groups;
+              },
+              {}
+            )
+          )
+            .sort(([dateA], [dateB]) => new Date(dateB) - new Date(dateA))
+            .map(([date, dateRequests]) => (
+              <div key={date} className="date-section">
+                <div className="date-header">
+                  {new Date(date).toLocaleDateString("th-TH", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </div>
+                <table className="tracking-table">
+                  <thead>
+                    <tr>
+                      <th>Request ID</th>
+                      <th>Patient Name</th>
+                      {hasPermissionToViewRequestorColumns() && (
+                        <th>Requestor</th>
+                      )}
+                      {hasPermissionToViewRequestorColumns() && (
+                        <th>Requested By</th>
+                      )}
+                      <th>Department</th>
+                      <th>Priority</th>
+                      <th>Escort</th>
+                      <th>Handling Time</th>
+                      <th>Item</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
 
-            <tbody>
-              {sortedRequests.map((request) => (
-                <tr key={request.request_id}>
-                  <td>{request.request_id}</td>
-                  <td>{request.patient_hn}</td>
-                  <td>{request.base_service_point_id}</td>
-                  <td>{request.priority || "-"}</td>
-                  <td>{request.request_type}</td>
-                  <td>
-                    {calculateHandlingTime(
-                      request.request_time,
-                      request.request_date
-                    )}
-                  </td>
-                  <td>{formatItemDisplay(request.item)}</td>
-                  <td>
-                    <span
-                      className={`status-indicator ${request.status.toLowerCase()}`}
-                    >
-                      {request.status}
-                    </span>
-                  </td>
-                  <td>{renderActionButtons(request)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  <tbody>
+                    {dateRequests.map((request) => (
+                      <tr key={request.request_id}>
+                        <td>{request.request_id}</td>
+                        <td>{request.patient_hn}</td>
+                        {hasPermissionToViewRequestorColumns() && (
+                          <td>{request.staff_name}</td>
+                        )}
+                        {hasPermissionToViewRequestorColumns() && (
+                          <td>{request.requestor}</td>
+                        )}
+                        <td>{request.base_service_point_id}</td>
+                        <td>{request.priority || "-"}</td>
+                        <td>{request.request_type}</td>
+                        <td>
+                          {calculateHandlingTime(
+                            request.request_time,
+                            request.request_date,
+                            request.last_finish
+                          )}
+                        </td>
+                        <td>{formatItemDisplay(request.item)}</td>
+                        <td>
+                          <span
+                            className={`status-indicator ${
+                              request.status.toLowerCase() === "evaluated"
+                                ? "evaluated"
+                                : request.status.toLowerCase() === "finished" ||
+                                  request.status.toLowerCase() === "completed"
+                                ? "completed"
+                                : request.status.toLowerCase() === "accepted"
+                                ? "accepted"
+                                : "pending"
+                            }`}
+                          >
+                            {request.status}
+                          </span>
+                        </td>
+                        <td>{renderActionButtons(request)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))
         )}
       </div>
 
-      {currentUserRole !== "patient_escort" && (
-        <>
-          {/* Added Live Escort Tracking with refresh button */}
-          {renderLiveEscortTracking()}
-
-          {renderDepartmentTracker()}
-        </>
-      )}
-
-      <EvaluationModal
+     <EvaluationModal
         open={evaluationModalOpen}
         handleClose={() => setEvaluationModalOpen(false)}
         request={selectedRequestForEvaluation}
         onSubmitEvaluation={handleSubmitEvaluation}
-        />
-
-      {/* Evaluation Results Modal */}
+        currentUser={SYSTEM_USER_ID}
+      />
+    {/* Evaluation Results Modal */}
       <EvaluationResultsModal
         open={evaluationResultsModalOpen}
         handleClose={() => setEvaluationResultsModalOpen(false)}
         evaluationData={evaluationData}
       />
-    </div>
+    <ExportModal
+        open={exportModalOpen}
+        handleClose={() => setExportModalOpen(false)}
+        exportData={handleExportData}
+        title="ส่งออกข้อมูล Patient Escort"
+      />
+   </div>
   );
 };
 

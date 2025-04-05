@@ -1,0 +1,45 @@
+.date-range-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  
+  /* Animation for loading state */
+  @keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+  }
+  
+  .loading-animation {
+    animation: pulse 1.5s infinite ease-in-out;
+  }
+  
+  /* Modal overlay styles */
+  .export-modal-overlay {
+    backdrop-filter: blur(3px);
+  }
+  
+  /* Modal header styles */
+  .export-modal-title {
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  
+  /* Button styles */
+  .export-button {
+    background: linear-gradient(45deg, #2196F3 30%, #21CBF3 90%);
+    border-radius: 3px;
+    border: 0;
+    color: white;
+    height: 40px;
+    padding: 0 30px;
+    box-shadow: 0 3px 5px 2px rgba(33, 203, 243, .3);
+    transition: background 0.3s ease;
+  }
+  
+  .export-button:hover {
+    background: linear-gradient(45deg, #1976D2 30%, #0D8FB1 90%);
+  }

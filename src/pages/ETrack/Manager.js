@@ -17,10 +17,9 @@ import SummarySection from "./components/Manager/SummarySection";
 import SystemStats from "./components/Manager/SystemStats";
 import DashboardFooter from "./components/Manager/DashboardFooter";
 import HeatMapCalendarContainer from "./components/Manager/HeatMapCalendarContainer";
-import SuccessRateChartContainer from "./components/Manager/SuccessRateChartContainer";
 import SuccessRateChart from "./components/Manager/SuccessRateChart";
 import { CHART_COLORS } from "./components/Manager/ChartSection";
-
+import RequestDistributionChart from "./components/Manager/RequestDistributionChart";
 
 // Import utilities
 import {
@@ -41,7 +40,17 @@ const COLORS = [
   "#82ca9d",
 ];
 const currentUser = localStorage.getItem("fullName");
-const currentDateTime = "2025-03-13 20:20:29";
+const getCurrentDateTime = () => {
+  const now = new Date();
+  return now.toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(',', '').replace(/\//g, '-').replace(' ', ' '); };
 
 console.log("currentUser", currentUser);
 console.log("getLocalData", getLocalData("fullName"));
@@ -54,7 +63,7 @@ const Manager = () => {
     endDate: "",
   });
 
-  
+   const [currentDateTime, setCurrentDateTime] = useState(getCurrentDateTime());
   // Core state for the application
   const [loading, setLoading] = useState(false);
 
@@ -69,8 +78,7 @@ const Manager = () => {
   const [filteredCoordRequests, setFilteredCoordRequests] = useState([]);
   const [filteredStaffSummary, setFilteredStaffSummary] = useState([]);
   const [filteredTranslatorSummary, setFilteredTranslatorSummary] = useState(
-    []
-  );
+    [] );
 
   // Stats data
   const [pendingEscortCount, setPendingEscortCount] = useState(0);
@@ -90,17 +98,16 @@ const Manager = () => {
   // Time-based chart data
   const [escortHourlyData, setEscortHourlyData] = useState([]);
   const [translatorHourlyData, setTranslatorHourlyData] = useState([]);
-  const [filteredEscortHourlyData, setFilteredEscortHourlyData] = useState([]);
-  const [filteredTranslatorHourlyData, setFilteredTranslatorHourlyData] =
+  const [, setFilteredEscortHourlyData] = useState([]);
+  const [, setFilteredTranslatorHourlyData] =
     useState([]);
 
   // Daily trend data
   const [escortDailyTrends, setEscortDailyTrends] = useState([]);
   const [translatorDailyTrends, setTranslatorDailyTrends] = useState([]);
-  const [filteredEscortDailyTrends, setFilteredEscortDailyTrends] = useState(
-    []
-  );
-  const [filteredTranslatorDailyTrends, setFilteredTranslatorDailyTrends] =
+  const [, setFilteredEscortDailyTrends] = useState(
+    [] );
+  const [, setFilteredTranslatorDailyTrends] =
     useState([]);
 
   // Daily hourly trend data
@@ -122,9 +129,8 @@ const Manager = () => {
   const [filteredLanguageDistribution, setFilteredLanguageDistribution] =
     useState([]);
   const [escorts, setEscorts] = useState([]);
-  const [filteredEscorts, setFilteredEscorts] = useState([]);
+  const [, setFilteredEscorts] = useState([]);
 
-  // Chart visibility state
   const [visibleCharts, setVisibleCharts] = useState({
     dailyTrends: true,
     languageDistribution: true,
@@ -135,17 +141,21 @@ const Manager = () => {
     successRate: true,
     topDepartments: true,
     handlingTimeScatter: true,
-
-
-    chartType: "line", // เพิ่มตัวเลือกประเภทของ chart (line, bar)
-  });
+    requestDistribution: true,
+    chartType: "line",  } );
 
   const dataTypeOptions = [
     { value: "patient_escort", label: "Patient Escort" },
     { value: "translator", label: "Translator/International Coordinator" },
   ];
 
-  // Add this function to the Manager.js file before the component definition
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(getCurrentDateTime());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
 
 // Function to calculate success rate data
 const calculateSuccessRate = (requests) => {
@@ -194,7 +204,6 @@ const calculateSuccessRate = (requests) => {
       : filteredCoordRequests
   );
   
-
   const handleDateRangeChange = (newDateRange) => {
     setDateRange(newDateRange);
     applyDateFilter(newDateRange);
@@ -220,9 +229,7 @@ const calculateSuccessRate = (requests) => {
       setFilteredLanguageDistribution(languageDistribution);
       setFilteredEscorts(escorts);
       setFilteredEscortDailyHourlyTrends(escortDailyHourlyTrends);
-      return;
-    }
-
+      return; }
     // Filter date range logic implementation
     const startDate = new Date(range.startDate);
     const endDate = new Date(range.endDate);
@@ -232,11 +239,8 @@ const calculateSuccessRate = (requests) => {
     const filteredEscortReqs = requests.filter((req) => {
       if (!req.request_date || !req.request_time) return false;
       const requestDateTime = new Date(
-        `${req.request_date} ${req.request_time}`
-      );
-      return requestDateTime >= startDate && requestDateTime <= endDate;
-    });
-
+        `${req.request_date} ${req.request_time}` ) ;
+      return requestDateTime >= startDate && requestDateTime <= endDate; } );
     setFilteredRequests(filteredEscortReqs);
 
     const pendingEscort = filteredEscortReqs.filter(
@@ -256,9 +260,7 @@ const calculateSuccessRate = (requests) => {
       const requestDateTime = new Date(
         `${req.request_date} ${req.request_time}`
       );
-      return requestDateTime >= startDate && requestDateTime <= endDate;
-    });
-
+      return requestDateTime >= startDate && requestDateTime <= endDate; } );
     setFilteredCoordRequests(filteredCoord);
 
     const pendingCoord = filteredCoord.filter(
@@ -320,8 +322,7 @@ const calculateSuccessRate = (requests) => {
     filteredEscortReqs.forEach((req) => {
       if (req.base_service_point_id) {
         filteredDeptCount[req.base_service_point_id] =
-          (filteredDeptCount[req.base_service_point_id] || 0) + 1;
-      }
+          (filteredDeptCount[req.base_service_point_id] || 0) + 1; }
     });
 
     const filteredDeptData = Object.keys(filteredDeptCount).map((dept) => ({
@@ -333,26 +334,20 @@ const calculateSuccessRate = (requests) => {
       filteredDeptData.length > 0 ? filteredDeptData : []
     );
 
-    // Language distribution filtering
-    const filteredLangCount = {};
+  const filteredLangCount = {};
     filteredCoord.forEach((req) => {
       if (req.language) {
         filteredLangCount[req.language] =
           (filteredLangCount[req.language] || 0) + 1;
       }
-    });
-
+     });
     const filteredLangData = Object.keys(filteredLangCount).map((lang) => ({
       name: lang,
       value: filteredLangCount[lang],
-    }));
-
+     }));
     setFilteredLanguageDistribution(
       filteredLangData.length > 0 ? filteredLangData : []
-    );
-  };
-
-  // Fetch patient escort requests
+    ); };
   const fetchRequests = async () => {
     setLoading(true);
     try {
@@ -365,8 +360,7 @@ const calculateSuccessRate = (requests) => {
             "Content-Type": "application/json",
             Accept: "application/json",
             Authorization: "Bearer " + token,
-          },
-        }
+          }, }
       );
 
       const iStatusCode = response.status;
@@ -376,7 +370,6 @@ const calculateSuccessRate = (requests) => {
         setRequests(resBody);
         setFilteredRequests(resBody);
 
-        // Calculate and update pending and completed counts for escorts
         const pending = resBody.filter(
           (req) => req.status?.toLowerCase() === "pending"
         ).length;
@@ -392,8 +385,7 @@ const calculateSuccessRate = (requests) => {
 
         // Process additional data
         processStaffSummary(resBody, setStaffSummary, setFilteredStaffSummary);
-
-        const { hourlyData, dailyData, dailyHourlyData } =
+         const { hourlyData, dailyData, dailyHourlyData } =
           processTimeBasedData(resBody);
         setEscortHourlyData(hourlyData);
         setFilteredEscortHourlyData(hourlyData);
@@ -416,8 +408,7 @@ const calculateSuccessRate = (requests) => {
     }
   };
 
-  // Fetch translator/coordinator requests
-  const fetchCoordRequestsData = useCallback(async () => {
+   const fetchCoordRequestsData = useCallback(async () => {
     setLoading(true);
     try {
       const token = getLocalData("token");
@@ -434,15 +425,13 @@ const calculateSuccessRate = (requests) => {
       );
 
       if (response.ok) {
-        const data = await response.json();
-
-        const dataArray = Array.isArray(data)
+         const data = await response.json();
+         const dataArray = Array.isArray(data)
           ? data
           : typeof data === "string"
           ? JSON.parse(data)
           : [];
-
-        if (
+         if (
           dataArray.length > 0 ||
           (typeof data === "object" && JSON.stringify(data).startsWith("["))
         ) {
@@ -468,7 +457,6 @@ const calculateSuccessRate = (requests) => {
 
           const pending = transformedData.filter(
             (req) => req.status?.toLowerCase() === "pending" ).length;
-
           const finished = transformedData.filter(
             (req) => req.status?.toLowerCase() === "finished" ).length;
 
@@ -485,7 +473,6 @@ const calculateSuccessRate = (requests) => {
             setFilteredLanguageDistribution
           );
 
-          // Process time-based data including daily hourly data
           const { hourlyData, dailyData, dailyHourlyData } =
             processTimeBasedData(transformedData);
           setTranslatorHourlyData(hourlyData);
@@ -495,8 +482,7 @@ const calculateSuccessRate = (requests) => {
           setTranslatorDailyHourlyTrends(dailyHourlyData);
           setFilteredTranslatorDailyHourlyTrends(dailyHourlyData);
         } else {
-          console.error("Could not process API response as an array:", data);
-        }
+          console.error("Could not process API response as an array:", data); }
       } else {
         console.error(
           "Failed to fetch requests data. Status:",
@@ -541,49 +527,37 @@ const calculateSuccessRate = (requests) => {
     setFilteredEscortDailyHourlyTrends(escortDailyHourlyTrends);
   };
 
-  // Chart options for dropdown
   const chartOptions =
-    selectedDataType === "patient_escort"
-      ? [
-          { value: "heatMapCalendar", label: "Activity Calendar (Heat Map)" },
-          { value: "dailyTrends", label: "Daily Trends Chart" },
-
-          {
-            value: "departmentDistribution",
-            label: "Department Distribution Chart",
-          },
-          
-          { value: "completionRate", label: "Completion Rate Chart" },
-          { value: "successRate", label: "Success Rate Chart" },
-          { value: "topDepartments", label: "Top Departments Chart" },
-          { value: "handlingTimeScatter", label: "Handling Time Scatter Plot" },
-        ]
-
-      : [
-          { value: "heatMapCalendar", label: "Activity Calendar (Heat Map)" },
-          { value: "dailyTrends", label: "Daily Trends Chart" },
-          
-          {
-            value: "languageDistribution",
-            label: "Language Distribution Chart",
-          },
-
-          { value: "requestLocations", label: "Request Locations Chart" },
-          { value: "completionRate", label: "Completion Rate Chart" },
-          { value: "successRate", label: "Success Rate Chart" },
-          { value: "topDepartments", label: "Top Departments Chart" },
-          { value: "handlingTimeScatter", label: "Handling Time Scatter Plot" },
-        ];
+  selectedDataType === "patient_escort"
+    ? [
+        { value: "heatMapCalendar", label: "Activity Calendar (Heat Map)" },
+        // { value: "dailyTrends", label: "Daily Trends Chart" },
+        { value: "departmentDistribution", label: "Department Distribution Chart" },
+        { value: "completionRate", label: "Completion Rate Chart" },
+        // { value: "successRate", label: "Success Rate Chart" },
+        { value: "topDepartments", label: "Top Departments Chart" },
+        { value: "requestDistribution", label: "Request Distribution Chart" },
+      ]
+    : [
+        { value: "heatMapCalendar", label: "Activity Calendar (Heat Map)" },
+        // { value: "dailyTrends", label: "Daily Trends Chart" },
+        { value: "languageDistribution", label: "Language Distribution Chart" },
+        { value: "requestLocations", label: "Request Locations Chart" },
+        { value: "completionRate", label: "Completion Rate Chart" },
+        // { value: "successRate", label: "Success Rate Chart" },
+        { value: "topDepartments", label: "Top Departments Chart" },
+        { value: "requestDistribution", label: "Request Distribution Chart" },
+      ];
 
   return (
     <div className="manager-container">
-      <DashboardHeader username={currentUser} dateTime="2025-03-13 20:21:58" />
+      <DashboardHeader username={currentUser} dateTime={currentDateTime} />
 
       <TypeSelector
         options={dataTypeOptions}
         value={selectedDataType}
         onChange={setSelectedDataType} />
-
+        
       <ControlsRow
         dateRange={dateRange}
         onDateChange={handleDateRangeChange}
@@ -600,11 +574,8 @@ const calculateSuccessRate = (requests) => {
         {dateRange.startDate && dateRange.endDate && (
           <div className="filter-badge">
             Filtered by date: {dateRange.startDate} to {dateRange.endDate}
-          </div>
-        )}
+          </div> ) }
       </div>
-
-      
 
       <Paper elevation={3} className="stats-container">
         <StatsDisplay
@@ -637,11 +608,9 @@ const calculateSuccessRate = (requests) => {
                   ? new Date(dateRange.startDate)
                   : new Date(
                       new Date().setFullYear(new Date().getFullYear() - 1)
-                    )
-              }
+                    ) }
               endDate={
-                dateRange.endDate ? new Date(dateRange.endDate) : new Date()
-              }
+                dateRange.endDate ? new Date(dateRange.endDate) : new Date() }
               currentUser={currentUser}
               currentDateTime={currentDateTime}
               selectedDataType={selectedDataType} />
@@ -655,9 +624,7 @@ const calculateSuccessRate = (requests) => {
             selectedDataType={selectedDataType}
             visibleCharts={visibleCharts}
             filteredEscortDailyHourlyTrends={filteredEscortDailyHourlyTrends}
-            filteredTranslatorDailyHourlyTrends={
-              filteredTranslatorDailyHourlyTrends
-            }
+            filteredTranslatorDailyHourlyTrends={ filteredTranslatorDailyHourlyTrends }
             filteredDepartmentDistribution={filteredDepartmentDistribution}
             filteredLanguageDistribution={filteredLanguageDistribution}
             filteredCoordRequests={filteredCoordRequests}
@@ -669,6 +636,27 @@ const calculateSuccessRate = (requests) => {
         </Grid>
       </Grid>
 
+      {visibleCharts.requestDistribution && (
+  <Grid container spacing={3}>
+    <Grid item xs={12}>
+      <RequestDistributionChart
+        title={`${
+          selectedDataType === "patient_escort"
+            ? "Patient Escort"
+            : "Translator"
+        } Request Distribution Analysis`}
+        data={
+          selectedDataType === "patient_escort"
+            ? filteredRequests
+            : filteredCoordRequests }
+        selectedDataType={selectedDataType}
+        currentUser={currentUser}
+        currentDateTime={currentDateTime}
+      />
+    </Grid>
+  </Grid>
+)}
+
 {visibleCharts.successRate && (
   <Grid container spacing={3}>
     <Grid item xs={12}>
@@ -679,7 +667,7 @@ const calculateSuccessRate = (requests) => {
             : "Translator"
         } Success Rate`}
         data={successRateData}
-        chartColors={CHART_COLORS}  // Make sure to use the constant from your Manager.js
+        chartColors={CHART_COLORS}  
         currentUser={currentUser}
         currentDateTime={currentDateTime}
         selectedDataType={selectedDataType}
@@ -687,7 +675,6 @@ const calculateSuccessRate = (requests) => {
     </Grid>
   </Grid>
 )}
-
       <SummarySection
         selectedDataType={selectedDataType}
         visibleCharts={visibleCharts}

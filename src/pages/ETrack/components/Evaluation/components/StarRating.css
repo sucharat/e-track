@@ -1,0 +1,90 @@
+/* Star Rating Styling */
+.star-rating-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .star-rating {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .star {
+    font-size: 2rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    display: inline-block;
+    position: relative;
+  }
+  
+  .star i {
+    color: #dcdcdc;
+    transition: color 0.2s ease-in-out;
+    display: block;
+  }
+  
+  .star.active i, .star.hover i {
+    color: #ffc107;
+    filter: drop-shadow(0 0 3px rgba(255, 193, 7, 0.5));
+  }
+  
+  .star:hover {
+    transform: scale(1.15);
+  }
+  
+  /* Star Rating Labels */
+  .star-rating-labels {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 0.5rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+  
+  /* Star Display for Read-Only Views */
+  .stars-display {
+    display: flex;
+    justify-content: center;
+    gap: 0.35rem;
+    margin: 0.5rem 0;
+  }
+  
+  .stars-display i {
+    font-size: 1.4rem;
+    transition: all 0.2s ease;
+  }
+  
+  .star-filled {
+    color: #ffc107;
+    filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.5));
+  }
+  
+  .star-empty {
+    color: #dcdcdc;
+  }
+  
+  /* Large Stars (for average display) */
+  .large-stars .stars-display i {
+    font-size: 2rem;
+  }
+  
+  /* Animation for stars */
+  @keyframes starPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  .star.active i {
+    animation: starPulse 0.5s ease-in-out;
+  }

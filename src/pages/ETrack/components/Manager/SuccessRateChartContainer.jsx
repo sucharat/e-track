@@ -13,7 +13,7 @@ const SuccessRateChartContainer = ({
   return (
     <ChartContainer title={title}>
       <SuccessRateChart
-        title=""  // Empty title since the container already has one
+        title="" 
         data={data}
         chartColors={chartColors}
         currentUser={currentUser}

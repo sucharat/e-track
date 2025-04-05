@@ -5,8 +5,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 // Custom styled components
 const StyledFormControl = styled(FormControl)(({ theme }) => ({
-  width: '100%', // Take full width of parent
-  maxWidth: '800px', // Maximum width constraint
+  width: '100%',
+  maxWidth: '800px',
   margin: '0 auto',
   '& .MuiOutlinedInput-root': {
     borderRadius: 12,
@@ -62,8 +62,7 @@ const TypeSelector = ({ options, value, onChange }) => {
   const handleChange = (event) => {
     onChange(event.target.value);
   };
-
-  return (
+return (
     <div className="dashboard-type-selection" style={{ padding: '16px 24px' }}>
       <Box sx={{ 
         display: 'flex', 

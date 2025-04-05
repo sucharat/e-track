@@ -1,16 +1,13 @@
 // components/Evaluation/EvaluationService.js
 import { url, getLocalData } from "../../../../helper/help";
-
 export const submitEvaluation = async (requestId, evaluationData) => {
   try {
     const token = getLocalData("token");
-    
     // Add requestId to the evaluation data if needed
     const payload = {
       ...evaluationData,
       request_id: requestId
     };
-    
     const response = await fetch(`${url}/api/Evaluation/OnCreateEvaluation`, {
       method: "POST",
       headers: {
@@ -19,10 +16,8 @@ export const submitEvaluation = async (requestId, evaluationData) => {
       },
       body: JSON.stringify(payload),
     });
-    
     // First check for non-200 responses
     if (!response.ok) {
-      // Try to parse the error response as JSON
       let errorMessage;
       try {
         const errorData = await response.json();

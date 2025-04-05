@@ -192,7 +192,6 @@ const SuccessRateChart = ({
               strokeWidth: 2,
             }}
           />
-
           {/* Add a reference line at 80% - good performance threshold */}
           <ReferenceLine
             y={80}

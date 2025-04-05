@@ -1,6 +1,10 @@
 import IntCoordTabsModal from "./components/IntCoordTabModal";
 import { useState, useEffect, useCallback } from "react";
 import { url, getLocalData } from "../../helper/help";
+import {
+  EvaluationModal,
+  EvaluationResultsModal,
+} from "./components/Evaluation/EvaluationModal";
 
 const IntCoordTab = () => {
   const [open, setOpen] = useState(false);
@@ -12,10 +16,19 @@ const IntCoordTab = () => {
   const [departmentTrackers, setDepartmentTrackers] = useState([]);
   const [movingDepartmentId, setMovingDepartmentId] = useState(null);
   const [newDepartments, setNewDepartments] = useState({});
+  const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
+  const [evaluationResultsModalOpen, setEvaluationResultsModalOpen] =
+    useState(false);
+  const [selectedRequestForEvaluation, setSelectedRequestForEvaluation] =
+    useState(null);
+  const [evaluationData, setEvaluationData] = useState(null);
+  const SYSTEM_USER_ID = localStorage.getItem("userId");
+  console.log(SYSTEM_USER_ID);
+  const [SYSTEM_DATETIME, setSYSTEM_DATETIME] = useState(
+    new Date().toISOString().slice(0, 19).replace("T", " ")
+  );
 
-  // เปลี่ยนการเรียกใช้ localStorage 
   const storedEmpType = localStorage.getItem("empType");
-  // Move these function declarations before any useEffect that depends on them
   const fetchTranslatorOptions = useCallback(async () => {
     try {
       const token = getLocalData("token");
@@ -73,56 +86,73 @@ const IntCoordTab = () => {
   const fetchDepartmentTrackerData = useCallback(async () => {
     try {
       const token = getLocalData("token");
-      const response = await fetch(url + "/api/ETrack/OnGetEtrackRequest?Type=translator", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: "Bearer " + token,
-        },
-      });
-  
+      const response = await fetch(
+        url + "/api/ETrack/OnGetEtrackRequest?Type=translator",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+
       if (response.ok) {
         const result = await response.json();
-        const dataArray = typeof result === "string" ? JSON.parse(result) : result;
-  
+        const dataArray =
+          typeof result === "string" ? JSON.parse(result) : result;
+
         const trackerData = dataArray.map((item) => {
-          const lastMovedDateTime = item.last_update ? new Date(item.last_update) : new Date(`${item.request_date}T${item.request_time}`);
+          const lastMovedDateTime = item.last_update
+            ? new Date(item.last_update)
+            : new Date(`${item.request_date}T${item.request_time}`);
           const now = new Date();
           const timeDiffMs = now - lastMovedDateTime;
           const timeInDeptMinutes = Math.floor(timeDiffMs / (1000 * 60));
           const hours = Math.floor(timeInDeptMinutes / 60);
           const minutes = timeInDeptMinutes % 60;
           let timeInDeptFormatted = "Just arrived";
-  
+
           if (timeInDeptMinutes > 0) {
             if (hours > 0) {
-              timeInDeptFormatted = `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min${minutes !== 1 ? "s" : ""}`;
+              timeInDeptFormatted = `${hours} hr${
+                hours > 1 ? "s" : ""
+              } ${minutes} min${minutes !== 1 ? "s" : ""}`;
             } else {
               timeInDeptFormatted = `${minutes} min${minutes !== 1 ? "s" : ""}`;
             }
           }
-  
+
           return {
             id: item.request_id,
             role: "International Coordinator",
             name: item.staff_name || "Unknown",
             currentDept: item.base_service_point_id || "Unknown",
             timeInDept: timeInDeptFormatted,
-            lastMovedTime: lastMovedDateTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            lastMovedTime: lastMovedDateTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
             status: item.status,
           };
         });
-  
-        setDepartmentTrackers(trackerData.filter(tracker => tracker.status !== "cancelled" && tracker.status !== "finished" && tracker.status !== "completed"));
+
+        setDepartmentTrackers(
+          trackerData.filter(
+            (tracker) =>
+              tracker.status !== "cancelled" &&
+              tracker.status !== "finished" &&
+              tracker.status !== "completed"
+          )
+        );
       }
     } catch (error) {
       console.error("Error fetching department tracker data:", error);
     }
   }, []);
-  
-  // Now use the functions in useEffect after they've been defined
-  useEffect(() => {
+
+useEffect(() => {
     fetchRequests();
     fetchTranslatorOptions();
     fetchDepartmentTrackerData();
@@ -135,22 +165,167 @@ const IntCoordTab = () => {
     }));
   };
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSYSTEM_DATETIME(
+        new Date().toISOString().slice(0, 19).replace("T", " ")
+      );
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleSubmitEvaluation = async (requestId, formData) => {
+
+    console.log("Form Data for Evaluation:", formData);
+    console.log("Request ID for Evaluation:", requestId);
+    if (!requestId) {
+      console.error("Invalid request ID for evaluation");
+      return;
+    }
+
+    try {
+      const result = await submitEvaluation(requestId, formData);
+      console.log("Evaluation submitted successfully");
+      setEvaluationModalOpen(false);  fetchRequestsData();
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const submitEvaluation = async (requestId, evaluationData) => {
+    try {
+      const token = getLocalData("token");
+      let employeeId = evaluationData.employee_id;
+      if (!employeeId) {
+        const request = requests.find(r => r.id === requestId || r.request_id === requestId);
+        if (request && request.staff_id) {
+          employeeId = request.staff_id;
+        } else {
+          const matchingRequest = requests.find(r => r.id === requestId || r.request_id === requestId);
+          if (matchingRequest) {
+            const matchingTranslator = translatorOptions.find(
+              t => t.full_name === matchingRequest.coordinatorName
+            );
+            if (matchingTranslator) {
+              employeeId = matchingTranslator.eid;
+            }
+          }
+        }
+      }
+      if (!employeeId) {
+        throw new Error("ไม่พบรหัสพนักงานสำหรับการประเมิน กรุณาระบุ employee_id ในข้อมูลประเมิน"); }
+  
+      const evaluationPayload = {
+        evaluator_id: SYSTEM_USER_ID,
+        employee_id: employeeId,
+        evaluation_date: SYSTEM_DATETIME.split(" ")[0],
+        evaluation_period: SYSTEM_DATETIME.split(" ")[0].substring(0, 7),
+        status: "submitted",
+        comments: evaluationData.comments || "",
+        active: "1",
+        request_id: requestId,
+        details: evaluationData.details.map((detail) => ({
+          criteria_id: detail.criteria_id,
+          criteria_name: detail.criteria_name || `เกณฑ์ที่ ${detail.criteria_id}`,
+          score: detail.score,
+          comments: detail.comments || "",
+        })),
+      };
+  
+      console.log("Submitting evaluation payload:", JSON.stringify(evaluationPayload));
+  
+      const evalResponse = await fetch(
+        `${url}/api/Evaluation/OnCreateEvaluation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(evaluationPayload),  }
+      );
+  
+      if (!evalResponse.ok) {
+        let errorMessage = `Failed to submit evaluation (${evalResponse.status})`;
+        try {
+          const errorResponse = await evalResponse.json();
+          errorMessage = errorResponse.message || errorResponse.title || errorMessage;
+          console.error("API error details:", errorResponse);
+        } catch (e) {
+          console.error("Error parsing error response:", e);
+        }
+        throw new Error(errorMessage); }
+  
+      const result = await evalResponse.json();
+      // อัปเดตสถานะ request 
+      await updateRequestStatus(requestId, "evaluated");
+      await fetchRequestsData();
+      return result;
+    } catch (error) {
+      console.error("Error submitting evaluation:", error);
+      throw error;
+    }
+  };
+
+  const getEvaluationResults = async (requestId) => {
+    try {
+      const token = getLocalData("token");
+
+      console.log(`Fetching evaluation for request ID: ${requestId}`);
+
+      const response = await fetch(
+        `${url}/api/Evaluation/OnGetEvaluationByRequestId/${requestId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log(`API response status: ${response.status}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch evaluation data: ${response.status}`); }
+      const responseData = await response.json();
+      console.log("API response data:", responseData);
+
+      const evaluationResult = {
+        ...responseData.evaluation,
+        details: responseData.details || [],
+        requestId: requestId,
+      };
+
+    setEvaluationData(evaluationResult);
+      return evaluationResult;
+    } catch (error) {
+      console.error("Error fetching evaluation results:", error);
+      alert(
+        `ไม่สามารถดึงข้อมูลการประเมินได้: ${
+          error.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ"
+        }`
+      );
+      throw error;
+    }
+  };
+
   const updateDepartment = async (id) => {
     if (!id || !newDepartments[id]) {
       alert("Please select a department");
-      return;
-    }
-  
-    // Add confirmation prompt before proceeding
-    const confirmUpdate = window.confirm("Are you sure you want to update the department?");
+      return; }
+    const confirmUpdate = window.confirm(
+      "Are you sure you want to update the department?"
+    );
     if (!confirmUpdate) {
-      return; // If the user cancels, exit the function without making any changes
-    }
-  
+      return; }
+
     try {
       setMovingDepartmentId(id);
       const token = getLocalData("token");
-  
+
       const response = await fetch(
         `${url}/api/ETrack/OnUpdateETrack?id=${id}`,
         {
@@ -165,10 +340,9 @@ const IntCoordTab = () => {
           }),
         }
       );
-  
+
       if (response.ok) {
-        // Update the local state
-        setDepartmentTrackers((prev) =>
+      setDepartmentTrackers((prev) =>
           prev.map((tracker) =>
             tracker.id === id
               ? {
@@ -183,16 +357,15 @@ const IntCoordTab = () => {
               : tracker
           )
         );
-        // Clear the selected department
+
         setNewDepartments((prev) => {
           const updated = { ...prev };
           delete updated[id];
           return updated;
         });
-  
+
         alert("Department updated successfully");
-        // Refresh the data
-        fetchDepartmentTrackerData();
+      fetchDepartmentTrackerData();
       } else {
         alert("Failed to update department");
       }
@@ -203,189 +376,7 @@ const IntCoordTab = () => {
       setMovingDepartmentId(null);
     }
   };
-
-  const [escorts, setEscorts] = useState([
-    {
-      name: "นิคม วรรณเลิศอุดม",
-      status: "available",
-      currentTask: "None",
-    },
-    {
-      name: "วิศว กิจผ่องแผ้ว",
-      status: "occupied",
-      currentTask: "None",
-    },
-    {
-      name: "อภิชาติ เก้าเอี้ยน",
-      status: "ontheway",
-      currentTask: "Transporting Request 10001",
-    },
-  ]);
-
-  const handleEscortStatusChange = (escortName) => {
-    setEscorts((prevEscorts) => {
-      return prevEscorts.map((escort) => {
-        if (escort.name === escortName) {
-          if (escort.status === "available") {
-            const pendingRequest = requests.find(
-              (req) => req.status === "pending"
-            );
-            return {
-              ...escort,
-              status: "ontheway",
-              currentTask: pendingRequest
-                ? `Transporting Request ${pendingRequest.id}`
-                : "None",
-            };
-          } else if (escort.status === "ontheway") {
-            return {
-              ...escort,
-              status: "occupied",
-            };
-          } else {
-            return {
-              ...escort,
-              status: "available",
-              currentTask: "None",
-            };
-          }
-        }
-        return escort;
-      });
-    });
-  };
-
-  const getActionButton = (status, name) => {
-    switch (status) {
-      case "available":
-        return (
-          <button
-            className="btn btn-primary"
-            onClick={() => handleEscortStatusChange(name)}
-          >
-            Assign Task
-          </button>
-        );
-
-      case "ontheway":
-        return (
-          <button
-            className="btn btn-warning"
-            onClick={() => handleEscortStatusChange(name)}
-          >
-            Arrived
-          </button>
-        );
-
-      case "occupied":
-        return (
-          <button
-            className="btn btn-success"
-            onClick={() => handleEscortStatusChange(name)}
-          >
-            Release
-          </button>
-        );
-      default:
-        return null;
-    }
-  };
-
-  // ดึงข้อมุลผู้ป่วย ====
-  const fetchRequests = async () => {
-    try {
-      var token = getLocalData("token");
-      const response = await fetch(
-        url + "/api/ETrack/OnGetEtrackRequest?Type=patient_escort",
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: "Bearer " + token,
-          },
-        }
-      );
-      const iStatusCode = response.status;
-      if (iStatusCode === 200) {
-        const result = await response.json();
-        var resBody = JSON.parse(result);
-        console.log(resBody);
-        setRequests(resBody);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const fetchRequestsData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const token = getLocalData("token");
-      const response = await fetch(
-        url + "/api/ETrack/OnGetEtrackRequest?Type=translator",
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: "Bearer " + token,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-
-        console.log("API Response Data Type:", typeof data);
-        console.log("API Response is Array:", Array.isArray(data));
-
-        const dataArray = Array.isArray(data)
-          ? data
-          : typeof data === "string"
-          ? JSON.parse(data)
-          : [];
-
-        if (
-          dataArray.length > 0 ||
-          (typeof data === "object" && JSON.stringify(data).startsWith("["))
-        ) {
-          const itemsToProcess =
-            dataArray.length > 0 ? dataArray : JSON.parse(JSON.stringify(data));
-
-          const transformedData = itemsToProcess.map((item) => ({
-            id: item.request_id,
-            coordinatorName: item.staff_name || "Unknown",
-            language: item.lang || "Unknown",
-            extension: item.staff_tel || "*0000",
-            department: item.detail || "Unknown",
-            urgency: "Normal",
-            status: item.status || "pending",
-
-            patient_hn: item.patient_hn,
-            base_service_point_id: item.base_service_point_id,
-            request_date: item.request_date,
-            request_time: item.request_time,
-          }));
-          setRequests(transformedData);
-          updateDashboardMetrics(transformedData);
-          updateTranslatorAvailability(transformedData);
-        } else {
-          console.error("Could not process API response as an array:", data);
-        }
-      } else {
-        console.error(
-          "Failed to fetch requests data. Status:",
-          response.status
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching requests data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+ 
   const updateTranslatorAvailability = useCallback(
     (requestsData) => {
       if (translatorOptions.length > 0) {
@@ -414,7 +405,7 @@ const IntCoordTab = () => {
         });
 
         requestsData.forEach((request) => {
-          for (const [eid, translator] of uniqueTranslators.entries()) {
+          for (const [translator] of uniqueTranslators.entries()) {
             if (translator.name === request.coordinatorName) {
               if (
                 request.status.toLowerCase() === "pending" ||
@@ -465,50 +456,245 @@ const IntCoordTab = () => {
     [translatorOptions]
   );
 
-  useEffect(() => {
-    fetchRequestsData();
-  }, [fetchRequestsData]);
+  // ดึงข้อมุลผู้ป่วย ====
+  const fetchRequests = async () => {
+    try {
+      var token = getLocalData("token");
+      const response = await fetch(
+        url + "/api/ETrack/OnGetEtrackRequest?Type=patient_escort",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+      const iStatusCode = response.status;
+      if (iStatusCode === 200) {
+        const result = await response.json();
+        var resBody = JSON.parse(result);
+        console.log(resBody);
+        setRequests(resBody);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
+  const fetchRequestsData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = getLocalData("token");
+      const response = await fetch(
+        url + "/api/ETrack/OnGetEtrackRequest?Type=translator",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: "Bearer " + token,
+          },
+          cache: 'no-store'
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+  
+      const result = await response.json();
+      let dataArray = [];
+      
+      if (Array.isArray(result)) {
+        dataArray = result;
+      } else if (typeof result === "string") {
+        try {
+          const parsed = JSON.parse(result);
+          dataArray = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.error("Error parsing JSON string:", e);
+          dataArray = [];
+        }
+      } else if (result && typeof result === "object") {
+        dataArray = [result];
+      }
+  
+      // Transform data
+      const transformedData = dataArray.map((item) => ({
+        id: item.request_id,
+        request_id: item.request_id,
+        coordinatorName: item.staff_name || "Unknown",
+        language: item.lang || "Unknown",
+        extension: item.staff_tel || "*0000",
+        department: item.detail || "Unknown",
+        urgency: item.priority || "Normal",
+        status: item.status || "pending",
+        patient_hn: item.patient_hn,
+        base_service_point_id: item.base_service_point_id,
+        request_date: item.request_date,
+        request_time: item.request_time,
+        staff_id: item.staff_id,
+        last_finish: item.last_finish,
+      }));
+  
+      // Filter requests if current user is a translator
+      const currentUserRole = localStorage.getItem("empType");
+      if (currentUserRole === "translator" && SYSTEM_USER_ID) {
+        // Filter requests to only show those assigned to the current translator
+        const filteredRequests = transformedData.filter(request => 
+          request.staff_id === SYSTEM_USER_ID
+        );
+        setRequests(filteredRequests);
+        updateDashboardMetrics(filteredRequests);
+        updateTranslatorAvailability(filteredRequests);
+      } else {
+        // For other roles (manager, admin, etc.), show all requests
+        setRequests(transformedData);
+        updateDashboardMetrics(transformedData);
+        updateTranslatorAvailability(transformedData);
+      }
+    } catch (error) {
+      console.error("Error fetching requests data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [updateTranslatorAvailability]);
+
+const calculateHandlingTime = (requestTimeStr, requestDateStr, lastFinishStr) => {
+  if (!requestTimeStr || !requestDateStr) return "-";
+  try {
+    const [year, month, day] = requestDateStr.split("-").map(Number);
+    const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
+
+    const requestDateTime = new Date(
+      year,
+      month - 1,
+      day,
+      hours,
+      minutes,
+      seconds
+    );
+
+    let endDateTime;
+    if (lastFinishStr) {
+      endDateTime = new Date(lastFinishStr.replace(" ", "T"));
+    } else {
+      endDateTime = new Date();
+    }
+    const diffMs = endDateTime - requestDateTime;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const remainingMinutes = diffMinutes % 60;
+
+    if (diffHours > 0) {
+      return `${diffHours}h ${remainingMinutes}m`;
+    } else {
+      return `${diffMinutes}m`;
+    }
+  } catch (error) {
+    console.error("Error calculating handling time:", error);
+    return "-";
+  }
+};
+
+const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFinishStr) => {
+  if (!requestTimeStr || !requestDateStr) return 0;
+  try {
+    const [year, month, day] = requestDateStr.split("-").map(Number);
+    const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
+    const requestDateTime = new Date(
+      year,
+      month - 1,
+      day,
+      hours,
+      minutes,
+      seconds
+    );
+
+    let endDateTime;
+    if (lastFinishStr) {
+      endDateTime = new Date(lastFinishStr.replace(" ", "T"));
+    } else {
+      endDateTime = new Date();
+    }
+
+    const diffMs = endDateTime - requestDateTime;
+    return Math.floor(diffMs / (1000 * 60));
+  } catch (error) {
+    console.error("Error calculating handling time in minutes:", error);
+    return 0;
+  }
+};
   const updateDashboardMetrics = (requestsData) => {
     const pendingRequests = requestsData.filter(
       (req) =>
         req.status.toLowerCase() === "pending" ||
         req.status.toLowerCase() === "created"
     ).length;
+    
     const completedRequests = requestsData.filter(
       (req) =>
         req.status.toLowerCase() === "finished" ||
         req.status.toLowerCase() === "completed"
     ).length;
+    
     const completionRate =
       requestsData.length > 0
         ? Math.round((completedRequests / requestsData.length) * 100)
         : 0;
-
+    let totalMinutes = 0;
+    let countableRequests = 0;
+  
+    requestsData.forEach((request) => {
+      if (request.request_time && request.request_date) {
+        totalMinutes += calculateHandlingTimeInMinutes(
+          request.request_time,
+          request.request_date,
+          request.last_finish
+        );
+        countableRequests++;
+      }
+    });
+  
+    let avgTimeText = "0 mins";
+    if (countableRequests > 0) {
+      const avgMinutes = Math.round(totalMinutes / countableRequests);
+      const hours = Math.floor(avgMinutes / 60);
+      const minutes = avgMinutes % 60;
+  
+      if (hours > 0) {
+        avgTimeText = `${hours}h ${minutes}m`;
+      } else {
+        avgTimeText = `${avgMinutes} mins`;
+      }
+    }
     const pendingElement = document.getElementById("coordPendingRequests");
     const completedElement = document.getElementById("coordCompletedRequests");
-    const completionRateElement = document.getElementById(
-      "coordCompletionRate"
-    );
-
+    const completionRateElement = document.getElementById("coordCompletionRate");
+    const avgTimeElement = document.getElementById("coordAvgResponseTime");
+  
     if (pendingElement) pendingElement.textContent = pendingRequests;
     if (completedElement) completedElement.textContent = completedRequests;
     if (completionRateElement)
-      completionRateElement.textContent = `${completionRate} %`;
+      completionRateElement.textContent = `${completionRate}%`;
+    if (avgTimeElement)
+      avgTimeElement.textContent = avgTimeText;
   };
 
   const handleSubmit = async (event, formData) => {
     try {
       event.preventDefault();
       console.log("Form Data Submitted:", formData);
-  
+
       let selectedTranslator = null;
       if (formData.translatorId && translatorOptions.length > 0) {
         selectedTranslator = translatorOptions.find(
           (t) => t.eid === formData.translatorId
         );
       }
-  
+
       if (!selectedTranslator) {
         console.warn("No translator selected or found. Using default values.");
         selectedTranslator = {
@@ -517,7 +703,7 @@ const IntCoordTab = () => {
           lang: formData.language || "German",
         };
       }
-  
+
       const data = {
         type: "translator",
         staff_id: selectedTranslator.eid || formData.translatorId || "6234",
@@ -529,12 +715,12 @@ const IntCoordTab = () => {
             lang_id: selectedTranslator.lang_id.toString() || "1",
           },
         ],
-  
+
         req: "translator_request",
       };
-  
+
       console.log("Sending request data:", data);
-  
+
       var token = getLocalData("token");
       const response = await fetch(url + "/api/ETrack/OnInsertRequest", {
         method: "POST",
@@ -545,9 +731,9 @@ const IntCoordTab = () => {
           Authorization: "Bearer " + token,
         },
       });
-  
+
       console.log("API Response Status:", response.status);
-  
+
       if (!response.ok) {
         let errorMessage = "บันทึกไม่สำเร็จ";
         try {
@@ -691,25 +877,31 @@ const IntCoordTab = () => {
 
   const renderActionButtons = (request) => {
     const isProcessing = processingId === request.id;
-    const status = request.status.toLowerCase();
-
+    const status = (request.status || "").toLowerCase();
+  
+    const userRole = localStorage.getItem("empType");
+    const isManagerOrAdmin =
+      userRole === "manager" ||
+      userRole === "admin" ||
+      userRole === "manager_translator";
+  
     const isPending = status === "pending" || status === "created";
     const isAccepted = status === "accepted";
     const isFinished = status === "finished" || status === "completed";
-
+    const isEvaluated = status === "evaluated";
+  
     return (
       <div className="action-buttons">
-        {!isFinished && (
+        {!isEvaluated && !isFinished && (
           <button
             className="btn btn-danger btn-sm"
             onClick={() => cancelTranslatorRequest(request.id)}
             disabled={isProcessing}
             style={{ marginRight: "5px" }}
           >
-            {isProcessing ? "Processing..." : "Cancel"}
+            {isProcessing ? "กำลังประมวลผล..." : "Cancel"}
           </button>
         )}
-
         {isPending && (
           <button
             className="btn btn-success btn-sm"
@@ -717,22 +909,67 @@ const IntCoordTab = () => {
             disabled={isProcessing}
             style={{ marginRight: "5px" }}
           >
-            {isProcessing ? "Processing..." : "Accept"}
+            {isProcessing ? "กำลังประมวลผล..." : "Accept"}
           </button>
         )}
-
         {isAccepted && (
           <button
             className="btn btn-primary btn-sm"
             onClick={() => updateRequestStatus(request.id, "finished")}
             disabled={isProcessing}
+            style={{ marginRight: "5px" }}
           >
-            {isProcessing ? "Processing..." : "Finish"}
+            {isProcessing ? "กำลังประมวลผล..." : "Finish"}
+          </button>
+        )}
+  
+        {isManagerOrAdmin && isFinished && !isEvaluated && (
+          <button
+            className="btn btn-info btn-sm"
+            onClick={() => {
+              // ค้นหาข้อมูล translator
+              const selectedTranslator = translatorOptions.find(
+                (t) => t.full_name === request.coordinatorName );
+              const completeRequest = {
+                ...request,
+                request_id: request.request_id || request.id,
+                staff_id: selectedTranslator ? selectedTranslator.eid : request.staff_id || "",
+              };
+  
+              setSelectedRequestForEvaluation(completeRequest);
+              setEvaluationModalOpen(true);
+            }}
+            disabled={isProcessing}
+            style={{ marginRight: "5px" }}
+          >
+            {isProcessing ? "กำลังประมวลผล..." : "Evaluate Staff"}
+          </button>
+        )}
+  
+        {isManagerOrAdmin && isEvaluated && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={async () => {
+              try {
+                const requestIdForEvaluation = request.request_id || request.id;
+                const results = await getEvaluationResults(requestIdForEvaluation);
+                setEvaluationData(results);
+                setEvaluationResultsModalOpen(true);
+              } catch (error) {
+                alert("Error fetching evaluation results: " + error.message);
+              }
+            }}
+            disabled={isProcessing}
+          >
+            {isProcessing ? "กำลังประมวลผล..." : "View Evaluation"}
           </button>
         )}
       </div>
     );
   };
+  useEffect(() => {
+    fetchRequestsData();
+  }, [fetchRequestsData]);
 
   const renderDepartmentTracker = () => {
     return (
@@ -748,7 +985,7 @@ const IntCoordTab = () => {
                 <th>Action</th>
               </tr>
             </thead>
-    
+
             <tbody>
               {departmentTrackers.length > 0 ? (
                 departmentTrackers.map((tracker) => (
@@ -758,10 +995,12 @@ const IntCoordTab = () => {
                     <td>{tracker.timeInDept}</td>
                     <td>
                       <div className="select-action-group">
-                        <select 
+                        <select
                           id={`trackerDeptSelect-${tracker.id}`}
                           className="dashboard-select"
-                          onChange={(e) => handleDepartmentChange(tracker.id, e.target.value)}
+                          onChange={(e) =>
+                            handleDepartmentChange(tracker.id, e.target.value)
+                          }
                           value={newDepartments[tracker.id] || ""}
                         >
                           <option value="">Select Department</option>
@@ -770,19 +1009,26 @@ const IntCoordTab = () => {
                           <option value="IVF">IVF</option>
                           <option value="OPD">OPD</option>
                           <option value="IPD">IPD</option>
-                          <option value="After: Checkup Contract">After: Checkup Contract</option>
+                          <option value="After: Checkup Contract">
+                            After: Checkup Contract
+                          </option>
                           <option value="After: Surgery">After: Surgery</option>
-                          <option value="After: Consultation">After: Consultation</option>
+                          <option value="After: Consultation">
+                            After: Consultation
+                          </option>
                         </select>
-  
-                        <button 
+
+                        <button
                           className="dashboard-btn btn-info"
                           onClick={() => updateDepartment(tracker.id)}
-                          disabled={movingDepartmentId === tracker.id || !newDepartments[tracker.id]}
+                          disabled={
+                            movingDepartmentId === tracker.id ||
+                            !newDepartments[tracker.id] }
                         >
-                          {movingDepartmentId === tracker.id ? "Processing..." : "Move Dept"}
+                          {movingDepartmentId === tracker.id
+                            ? "Processing..."
+                            : "Move Dept" }
                         </button>
-
                       </div>
                     </td>
                   </tr>
@@ -826,7 +1072,8 @@ const IntCoordTab = () => {
             handleSubmit={handleSubmit}
             translatorOptions={translatorOptions}
             currentUser={currentLoginId}
-            currentDateTime={currentDateTime} />
+            currentDateTime={currentDateTime}
+          />
           {(storedEmpType === "manager" ||
             storedEmpType === "manager_translator" ||
             storedEmpType === "user") && (
@@ -842,7 +1089,6 @@ const IntCoordTab = () => {
           >
             {loading ? "Loading..." : "Refresh Data"}
           </button>
-
         </div>
       </div>
 
@@ -901,12 +1147,16 @@ const IntCoordTab = () => {
         </div>
       )}
 
-      <div className="request-panel">
-        <h2>International Coordinator's Requests</h2>
-        {loading ? (
-          <p>Loading requests data...</p>
-        ) : (
-          <table className="tracking-table">
+<div className="request-panel">
+  <h2>International Coordinator's Requests</h2>
+  {loading ? (
+    <div className="loading-container">
+      <p>กำลังโหลดข้อมูล...</p>
+      <div className="loading-spinner"></div>
+    </div>
+  ) : (
+    <div className="table-responsive">
+      <table className="tracking-table">
             <thead>
               <tr>
                 <th>Coord Req. ID</th>
@@ -915,50 +1165,63 @@ const IntCoordTab = () => {
                 <th>Extension</th>
                 <th>Department</th>
                 <th>Urgency</th>
+                <th>Handling Time</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {requests.length > 0 ? (
-                requests.map((request) => (
-                  <tr key={request.id}>
-                    <td>{request.id}</td>
-                    <td>{request.coordinatorName}</td>
-                    <td>{request.language}</td>
-                    <td>{request.extension}</td>
-                    <td>{request.department}</td>
-                    <td>{request.urgency}</td>
-                    <td>
-                      <span
-                        className={`status-indicator ${
-                          request.status.toLowerCase() === "finished" ||
-                          request.status.toLowerCase() === "completed"
-                            ? "completed"
-                            : request.status.toLowerCase() === "accepted"
-                            ? "accepted"
-                            : "pending"
-                        }`}
-                      >
-                        {request.status}
-                      </span>
-                    </td>
-                    <td>{renderActionButtons(request)}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="8" style={{ textAlign: "center" }}>
-                    No requests found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-
-          </table>
-        )}
-      </div>
+  {requests.length > 0 ? (
+    // Add sorting here, before mapping over the requests
+    [...requests]
+      .sort((a, b) => b.id - a.id)
+      .map((request) => (
+        <tr key={request.id}>
+          <td>{request.id}</td>
+          <td>{request.coordinatorName}</td>
+          <td>{request.language}</td>
+          <td>{request.extension}</td>
+          <td>{request.department}</td>
+          <td>{request.urgency}</td>
+          <td>
+            {calculateHandlingTime(
+              request.request_time,
+              request.request_date,
+              request.last_finish
+            )}
+          </td>
+          <td>
+            <span
+              className={`status-indicator ${
+                request.status?.toLowerCase() === "evaluated"
+                  ? "evaluated"
+                  : request.status?.toLowerCase() === "finished" ||
+                    request.status?.toLowerCase() === "completed"
+                  ? "completed"
+                  : request.status?.toLowerCase() === "accepted"
+                  ? "accepted"
+                  : "pending"
+              }`}
+            >
+              {request.status || "pending"}
+            </span>
+          </td>
+          <td>{renderActionButtons(request)}</td>
+        </tr>
+      ))
+  ) : (
+    <tr>
+      <td colSpan="9" style={{ textAlign: "center" }}>
+        ไม่พบข้อมูลคำขอ
+      </td>
+    </tr>
+  )}
+</tbody>
+      </table>
+    </div>
+  )}
+</div>
 
       {/* แสดงส่วนนี้เฉพาะกรณีที่ไม่ใช่ translator */}
       {storedEmpType !== "translator" && (
@@ -995,11 +1258,23 @@ const IntCoordTab = () => {
                   </tr>
                 ))}
               </tbody>
-              
             </table>
           </div>
 
-          {renderDepartmentTracker()}
+          {/* ตารางDepartment */}
+          {/* {renderDepartmentTracker()}  */}
+         <EvaluationModal
+            open={evaluationModalOpen}
+            handleClose={() => setEvaluationModalOpen(false)}
+            request={selectedRequestForEvaluation}
+            onSubmitEvaluation={handleSubmitEvaluation}
+            currentUser={SYSTEM_USER_ID} 
+         />
+        <EvaluationResultsModal
+            open={evaluationResultsModalOpen}
+            handleClose={() => setEvaluationResultsModalOpen(false)}
+            evaluationData={evaluationData}
+          />
         </>
       )}
     </div>

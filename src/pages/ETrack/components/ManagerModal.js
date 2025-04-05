@@ -43,10 +43,8 @@ const ManagerModal = ({ open, handleClose, handleSubmit }) => {
             value={formData.patient}
             onChange={handleChange}
             margin="normal"
-            required
-            
+            require 
           />
-
           <Typography variant="subtitle1" gutterBottom>
             Department:
           </Typography>
@@ -58,7 +56,6 @@ const ManagerModal = ({ open, handleClose, handleSubmit }) => {
             <MenuItem value="BadalVeda Diving Medical Center">BadalVeda Diving Medical Center</MenuItem>
             <MenuItem value="C.C.U.">C.C.U.</MenuItem>
           </Select>
-
           <Typography variant="subtitle1" gutterBottom>
             Priority:
           </Typography>
@@ -67,7 +64,6 @@ const ManagerModal = ({ open, handleClose, handleSubmit }) => {
             <MenuItem value="High">High</MenuItem>
             <MenuItem value="Emergency">Emergency</MenuItem>
           </Select>
-
           <Typography variant="subtitle1" gutterBottom>
             Escort:
           </Typography>
@@ -78,7 +74,6 @@ const ManagerModal = ({ open, handleClose, handleSubmit }) => {
             <MenuItem value="ภรเทพ หมันกุล">ภรเทพ หมันกุล</MenuItem>
             <MenuItem value="อภิวัฒน์ ฟองพิทักษ์">อภิวัฒน์ ฟองพิทักษ์</MenuItem>
           </Select>
-
           <Typography variant="subtitle1" gutterBottom>
             Item:
           </Typography>
@@ -91,7 +86,6 @@ const ManagerModal = ({ open, handleClose, handleSubmit }) => {
             <MenuItem value="ถัง Oxygen">ถัง Oxygen</MenuItem>
             <MenuItem value="Padslide">Padslide</MenuItem>
           </Select>
-
           <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>
             Submit Request
           </Button>
@@ -102,7 +96,6 @@ const ManagerModal = ({ open, handleClose, handleSubmit }) => {
       </Box>
     </Modal>
   );
-
 
 };
 

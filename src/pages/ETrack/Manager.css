@@ -27,7 +27,7 @@
   margin: 0;
 }
 
-.user-info {
+.user-info-head {
   margin-top: 0.3rem;
   font-size: 0.9rem;
   color: #7f8c8d;
@@ -827,4 +827,30 @@
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid #eee;
+}
+
+/* ตาราง My Requests */
+.date-section {
+  margin-bottom: 2rem;
+}
+
+.date-header {
+  background-color: #f8f9fa;
+  padding: 0.75rem 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #4299e1;
+}
+
+.tracking-table {
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+/* Add space between date sections */
+.date-section + .date-section {
+  margin-top: 2rem;
 }

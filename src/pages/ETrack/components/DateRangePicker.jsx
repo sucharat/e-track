@@ -9,7 +9,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 const DateRangePicker = ({ onDateChange }) => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [filterType, setFilterType] = useState("custom"); // custom, month, year
+  const [filterType, setFilterType] = useState("custom");
   const [showFilters, setShowFilters] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -48,19 +48,16 @@ const DateRangePicker = ({ onDateChange }) => {
       const today = new Date();
       const year = today.getFullYear();
       const month = String(today.getMonth() + 1).padStart(2, "0");
-      setStartDate(`${year}-${month}-01`);
-      
-      // Calculate last day of the month
+    setStartDate(`${year}-${month}-01`);
       const lastDay = new Date(year, today.getMonth() + 1, 0).getDate();
-      setEndDate(`${year}-${month}-${lastDay}`);
+    setEndDate(`${year}-${month}-${lastDay}`);
     } else if (type === "year") {
       const year = new Date().getFullYear();
       setStartDate(`${year}-01-01`);
       setEndDate(`${year}-12-31`);
     } else {
-      // For custom, clear the fields
-      setStartDate("");
-      setEndDate("");
+     setStartDate("");
+     setEndDate("");
     }
   };
 
@@ -70,24 +67,21 @@ const DateRangePicker = ({ onDateChange }) => {
 
   // Format range for display
   const getDisplayRange = () => {
-    if (!startDate && !endDate) return "Select date range";
+  if (!startDate && !endDate) return "Select date range";
     
-    if (filterType === "month") {
+  if (filterType === "month") {
       const date = new Date(startDate);
       return date.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
-    
-    if (filterType === "year") {
+  if (filterType === "year") {
       return startDate.substring(0, 4);
     }
-    
-    // Custom range
-    if (startDate && endDate) {
+  if (startDate && endDate) {
       const start = new Date(startDate).toLocaleDateString();
       const end = new Date(endDate).toLocaleDateString();
       return `${start} - ${end}`;
     }
-    
+
     return "Incomplete range";
   };
 

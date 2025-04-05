@@ -104,7 +104,7 @@ const HeatMapCalendar = ({
 
       if (sortedYears.length > 0) {
         setAvailableYears(sortedYears);
-        setSelectedYear(sortedYears[0]); // เลือกปีล่าสุดเป็นค่าเริ่มต้น
+        setSelectedYear(sortedYears[0]); // เลือกปีล่าสุด
       } else {
         setAvailableYears([new Date().getFullYear()]);
         setSelectedYear(new Date().getFullYear());
@@ -133,7 +133,7 @@ const HeatMapCalendar = ({
     setSelectedYear(event.target.value);
   };
 
-  // เตรียมข้อมูลสำหรับ heat map
+  // ข้อมูล heat map
   const heatmapData = {};
   filteredData.forEach((request) => {
     if (request.request_date) {
@@ -148,11 +148,10 @@ const HeatMapCalendar = ({
     count: heatmapData[date],
   }));
 
-  // จัดการเมื่อคลิกที่วันในปฏิทิน
   const handleDayClick = (value) => {
     if (!value || !value.date) return;
 
-    // ดึงข้อมูล request ของวันนั้น
+    // ดึงข้อมูล request
     const dayData = data.filter((req) => req.request_date === value.date);
     setDayRequests(dayData);
     setSelectedDay(value.date);
@@ -160,12 +159,10 @@ const HeatMapCalendar = ({
     setCurrentTab(0);
   };
 
-  // จัดการการเปลี่ยนแท็บ
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
   };
 
-  // จัดกลุ่มข้อมูลตามชั่วโมง
   const hourlyData =
     dayRequests.length > 0
       ? Array.from(
@@ -220,7 +217,7 @@ const HeatMapCalendar = ({
   const requestTypeTitle = isPatientEscort ? "Patient Escort" : "Translator";
   const mainColor = isPatientEscort ? "#2e7d32" : "#0288d1"; // สีหลักตามประเภท
 
-  // สร้างสีสำหรับ avatar
+  // สีสำหรับ avatar
   const getAvatarColor = (name) => {
     const colors = [
       "#1976d2",
@@ -312,7 +309,6 @@ const HeatMapCalendar = ({
       requests: staff.requests.filter((req) => filterData([req]).length > 0),
     }));
 
-  // Handle sort
   const requestSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -438,13 +434,11 @@ const HeatMapCalendar = ({
               if (!value || value.count === 0) {
                 return "color-empty";
               }
-              // ปรับการคำนวณระดับสี
               let level;
               if (value.count <= 2) level = 1;
               else if (value.count <= 5) level = 2;
               else if (value.count <= 10) level = 3;
               else level = 4;
-
               return `color-scale-${level} ${
                 isPatientEscort ? "escort" : "translator"
               }`;
@@ -488,7 +482,6 @@ const HeatMapCalendar = ({
               stroke: rgba(0, 0, 0, 0.04);
               stroke-width: 0.5;
             }
-
             .color-scale-1.escort {
               fill: #a5d6a7;
               opacity: 0.95;
@@ -513,7 +506,6 @@ const HeatMapCalendar = ({
               stroke: rgba(46, 125, 50, 0.1);
               stroke-width: 0.5;
             }
-
             .color-scale-1.translator {
               fill: #90caf9;
               opacity: 0.95;
@@ -538,38 +530,32 @@ const HeatMapCalendar = ({
               stroke: rgba(2, 136, 209, 0.1);
               stroke-width: 0.5;
             }
-
             .react-calendar-heatmap .react-calendar-heatmap-small-text {
               font-size: 5px;
               font-weight: 500;
             }
-
             .react-calendar-heatmap rect {
               rx: 2px;
               ry: 2px;
               transition: all 0.2s ease;
             }
-
             .react-calendar-heatmap rect:hover {
               stroke: rgba(0, 0, 0, 0.2);
               stroke-width: 1;
               cursor: pointer;
               filter: brightness(0.95);
             }
-
             .react-calendar-heatmap .react-calendar-heatmap-month-labels,
             .react-calendar-heatmap .react-calendar-heatmap-weekday-labels {
               font-size: 8px;
               fill: #666;
               font-weight: 500;
             }
-
             .react-calendar-heatmap text {
               font-size: 10px;
               fill: #666;
               font-weight: 500;
             }
-
             .react-calendar-heatmap .color-empty,
             .react-calendar-heatmap .color-scale-1,
             .react-calendar-heatmap .color-scale-2,
@@ -623,7 +609,6 @@ const HeatMapCalendar = ({
                 mr: 2,
               }}
             />
-
             <IconButton
               edge="end"
               color="inherit"
@@ -1214,7 +1199,6 @@ const HeatMapCalendar = ({
                                   ID: {req.request_id}
                                 </Typography>
                               </Box>
-
                               <Box
                                 sx={{
                                   display: "flex",
@@ -1245,7 +1229,6 @@ const HeatMapCalendar = ({
                                     {req.staff_name || "Unknown"}
                                   </Typography>
                                 </Box>
-
                                 <Typography
                                   variant="caption"
                                   sx={{ color: "text.secondary" }}
@@ -1253,7 +1236,6 @@ const HeatMapCalendar = ({
                                   {req.base_service_point_id || "N/A"}
                                 </Typography>
                               </Box>
-
                               <Box
                                 sx={{
                                   mt: 0.5,
@@ -1434,6 +1416,7 @@ const HeatMapCalendar = ({
                           sx={{ fontWeight: 700, minWidth: "40px" }}
                         />
                       </TableCell>
+                      
                       <TableCell>
                         <Paper
                           variant="outlined"

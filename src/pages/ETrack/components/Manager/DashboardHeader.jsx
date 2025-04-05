@@ -5,13 +5,10 @@ const DashboardHeader = ({ username, dateTime }) => {
     <div className="manager-header">
       <div className="header-left">
         <h1 className="dashboard-title">E-TRACK Management Dashboard</h1>
-        <div className="user-info">
-          User: <span className="user-id">{username}</span>
-        </div>
       </div>
-      <div className="header-right">
+      {/* <div className="header-right">
         <div className="current-time">{dateTime}</div>
-      </div>
+      </div> */}
     </div>
   );
 };
