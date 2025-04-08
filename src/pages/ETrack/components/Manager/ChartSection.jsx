@@ -822,7 +822,7 @@ const normalizedLangData = normalizedLanguageDistribution();
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: false,
-              })} • {currentUser || "b6428259"}
+              })} • {currentUser || ""}
             </span>
           </div>
         </ChartContainer>
