@@ -70,8 +70,84 @@ export const PATIENT_ESCORT_TEMPLATE = {
       }
     ]
   };
-  
-  
+
+  export const COORDINATOR_TEMPLATE = {
+    sheetName: "Coordinator Requests",
+    title: "INTERNATIONAL COORDINATOR SERVICE REQUESTS",
+    headers: [
+      'Request ID', 'Request Date', 'Request Time', 'Patient HN', 'Patient Name',
+      'Coordinator Name', 'Language', 'Extension', 'Department', 
+      , 'Finish Date', 'Finish Time', 'Requestor'
+    ],
+    columns: [
+      { header: 'Request ID', key: 'request_id', width: 10 },
+      { header: 'Request Date', key: 'request_date', width: 12 },
+      { header: 'Request Time', key: 'request_time', width: 10 },
+      { header: 'Patient HN', key: 'patient_hn', width: 12 },
+      { header: 'Patient Name', key: 'patient_name', width: 25 },
+      { header: 'Coordinator Name', key: 'staff_name', width: 25 },
+      { header: 'Language', key: 'lang', width: 15 },
+      { header: 'Extension', key: 'staff_tel', width: 10 },
+      { header: 'Department', key: 'detail', width: 15 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Finish Date', key: 'finish_date', width: 12, formatter: (item) => 
+        item.last_finish ? item.last_finish.split(' ')[0] : '' },
+      { header: 'Finish Time', key: 'finish_time', width: 10, formatter: (item) => 
+        item.last_finish ? item.last_finish.split(' ')[1] : '' },
+      { header: 'Requestor', key: 'requestor', width: 20 }
+    ],
+    statistics: [
+      { title: 'Total Requests', calculator: (data) => data.length },
+      { 
+        title: 'Completed Requests', 
+        calculator: (data) => data.filter(item => 
+          item.status === 'finished' || 
+          item.status === 'completed' || 
+          item.status === 'evaluated'
+        ).length 
+      },
+      { 
+        title: 'Completion Rate', 
+        calculator: (data) => {
+          const total = data.length;
+          const completed = data.filter(item => 
+            item.status === 'finished' || 
+            item.status === 'completed' || 
+            item.status === 'evaluated'
+          ).length;
+          return total > 0 ? `${((completed / total) * 100).toFixed(2)}%` : '0%';
+        }
+      },
+      { 
+        title: 'Pending Requests', 
+        calculator: (data) => data.filter(item => 
+          item.status === 'pending' || 
+          item.status === 'created'
+        ).length 
+      },
+      { 
+        title: 'Average Handling Time (minutes)', 
+        calculator: (data) => {
+          const completedRequests = data.filter(item => 
+            (item.status === 'finished' || item.status === 'completed' || item.status === 'evaluated') && 
+            item.last_finish && item.request_time && item.request_date
+          );
+          
+          if (completedRequests.length === 0) return 'N/A';
+          
+          const totalMinutes = completedRequests.reduce((total, item) => {
+            const requestDate = new Date(`${item.request_date}T${item.request_time}`);
+            const finishDate = new Date(item.last_finish.replace(' ', 'T'));
+            const diffMinutes = Math.floor((finishDate - requestDate) / (1000 * 60));
+            return total + diffMinutes;
+          }, 0);
+          
+          return (totalMinutes / completedRequests.length).toFixed(2);
+        }
+      }
+    ]
+  };
+
   // สามารถเพิ่มเทมเพลตอื่นๆ ได้ในอนาคต เช่น
   export const SUMMARY_REPORT_TEMPLATE = {
     // รายละเอียดของเทมเพลตสำหรับรายงานสรุป

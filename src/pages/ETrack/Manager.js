@@ -67,6 +67,14 @@ const Manager = () => {
   // Core state for the application
   const [loading, setLoading] = useState(false);
 
+  const getCurrentDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
   // Original data
   const [requests, setRequests] = useState([]);
   const [coordRequests, setCoordRequests] = useState([]);
@@ -565,9 +573,7 @@ const calculateSuccessRate = (requests) => {
         visibleCharts={visibleCharts}
         setVisibleCharts={setVisibleCharts}/>
 
-
-
-      <div className="dashboard-section-title">
+    <div className="dashboard-section-title">
         <h2>
           {selectedDataType === "patient_escort"
             ? "Patient Escort Management"

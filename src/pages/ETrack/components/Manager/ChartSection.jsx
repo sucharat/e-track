@@ -219,8 +219,8 @@ const ChartSection = ({
     }));
   };
 
-  // Calculate top departments with enhanced visualization
-  const calculateTopDepartments = (requests) => {
+   // Calculate top departments with normalized percentages
+   const calculateTopDepartments = (requests) => {
     const deptCount = {};
     let totalRequests = 0;
 
@@ -232,11 +232,15 @@ const ChartSection = ({
       totalRequests++;
     });
 
+    // Find the maximum number of requests for any department
+    const maxRequests = Math.max(...Object.values(deptCount));
+    
     const result = Object.keys(deptCount)
       .map((dept, index) => ({
         name: dept,
         count: deptCount[dept],
-        percentage: ((deptCount[dept] / totalRequests) * 100).toFixed(1),
+        // Normalize percentage so that the department with most requests is 100%
+        percentage: ((deptCount[dept] / maxRequests) * 100).toFixed(1),
         color:
           CHART_COLORS.primary.translator[
             index % CHART_COLORS.primary.translator.length
@@ -251,6 +255,44 @@ const ChartSection = ({
     });
     return result;
   };
+
+// For the Department distribution chart, normalize the data
+const normalizedDepartmentDistribution = () => {
+  if (!filteredDepartmentDistribution || filteredDepartmentDistribution.length === 0) {
+    return [];
+  }
+  
+  // Find the maximum value
+  const maxValue = Math.max(...filteredDepartmentDistribution.map(item => item.value));
+  
+  // Normalize values so that the highest is 100%
+  return filteredDepartmentDistribution.map(item => ({
+    ...item,
+    normalizedValue: (item.value / maxValue),
+    originalValue: item.value // Keep original value for reference
+  }));
+};
+
+// For the Language distribution chart, normalize the data the same way
+const normalizedLanguageDistribution = () => {
+  if (!filteredLanguageDistribution || filteredLanguageDistribution.length === 0) {
+    return [];
+  }
+  
+  // Find the maximum value
+  const maxValue = Math.max(...filteredLanguageDistribution.map(item => item.value));
+  
+  // Normalize values so that the highest is 100%
+  return filteredLanguageDistribution.map(item => ({
+    ...item,
+    normalizedValue: (item.value / maxValue),
+    originalValue: item.value // Keep original value for reference
+  }));
+};
+
+const normalizedDeptData = normalizedDepartmentDistribution();
+const normalizedLangData = normalizedLanguageDistribution();
+
 
   // Calculate success rate data for the appropriate request type
   // Calculate handling time distribution
@@ -274,13 +316,9 @@ const ChartSection = ({
           <ChartContainer title="Patient Escort Department Distribution">
             <div className="chart-with-info">
               <ResponsiveContainer width="100%" height={320}>
-                {" "}
-                {/* Reduced height */}
                 <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                  {" "}
-                  {/* Added margins */}
                   <Pie
-                    data={filteredDepartmentDistribution}
+                    data={normalizedDeptData}
                     cx="50%"
                     cy="50%"
                     labelLine={{
@@ -289,13 +327,13 @@ const ChartSection = ({
                       strokeDasharray: "2 2",
                     }}
                     label={
-                      ({ name, percent }) =>
-                        `${name} (${formatPercent(percent * 100)})`
+                      ({ name, normalizedValue }) =>
+                        `${name} (${formatPercent(normalizedValue * 100)})`
                     }
                     outerRadius={100}
                     innerRadius={55}
                     paddingAngle={2}
-                    dataKey="value"
+                    dataKey="normalizedValue" // Use the normalized value for the pie chart
                     stroke="#ffffff"
                     strokeWidth={1.5}
                     isAnimationActive={true}
@@ -303,7 +341,7 @@ const ChartSection = ({
                     animationDuration={1000}
                     animationEasing="ease-out"
                   >
-                    {filteredDepartmentDistribution.map((_entry, index) => (
+                    {normalizedDeptData.map((_entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={
@@ -317,10 +355,7 @@ const ChartSection = ({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name) => [
-                      `${formatPercent(value * 100)}`,
-                      name,
-                    ]}
+                    formatter={(value, name) => [`${formatPercent(value * 100)}`, name]}
                     contentStyle={{
                       borderRadius: "6px",
                       padding: "8px",
@@ -339,6 +374,8 @@ const ChartSection = ({
                       fontSize: "11px",
                       lineHeight: "14px",
                     }}
+                    // Fix: Don't use custom formatter for legend, let's use nameKey instead
+                    // formatter was causing the React child error
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -356,7 +393,7 @@ const ChartSection = ({
                 }}
               >
                 <div style={{ color: "#666" }}>
-                  Total: {filteredDepartmentDistribution.length} departments
+                  Total: {normalizedDeptData.length} departments • Highest dept. shown as 100%
                 </div>
                 <div
                   style={{
@@ -379,7 +416,7 @@ const ChartSection = ({
                     <circle cx="12" cy="12" r="10" />
                     <polyline points="12 6 12 12 16 14" />
                   </svg>
-                  {new Date("2025-04-02 07:34:28").toLocaleString("en-US", {
+                  {new Date("2025-04-08 14:10:42").toLocaleString("en-US", {
                     year: "numeric",
                     month: "2-digit",
                     day: "2-digit",
@@ -697,7 +734,7 @@ const ChartSection = ({
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
-                data={filteredLanguageDistribution}
+                data={normalizedLangData}
                 cx="50%"
                 cy="50%"
                 labelLine={{
@@ -706,14 +743,15 @@ const ChartSection = ({
                   strokeDasharray: "2 2",
                 }}
                 label={
-                  ({ name, percent }) => (percent > 0.05 ? `${name}` : "")
+                  ({ name, normalizedValue }) => (normalizedValue > 0.05 ? `${name}` : "")
                 }
                 outerRadius={85}
                 innerRadius={55}
                 paddingAngle={3}
-                dataKey="value"
+                dataKey="normalizedValue" // Use normalized value
+                nameKey="name"
               >
-                {filteredLanguageDistribution.map((entry, index) => (
+                {normalizedLangData.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={
@@ -727,7 +765,7 @@ const ChartSection = ({
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value, name) => [formatPercent(value * 100), name]}
+                formatter={(value, name) => [`${formatPercent(value * 100)}`, name]}
                 contentStyle={{
                   backgroundColor: "rgba(255, 255, 255, 0.98)",
                   borderRadius: "8px",
@@ -752,7 +790,7 @@ const ChartSection = ({
                   flexWrap: "wrap",
                   lineHeight: "16px",
                 }}
-                payload={filteredLanguageDistribution.map((entry, index) => ({
+                payload={normalizedLangData.map((entry, index) => ({
                   value: entry.name,
                   type: "circle",
                   color:
@@ -767,7 +805,7 @@ const ChartSection = ({
           <div
             style={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
               alignItems: "center",
               padding: "6px 8px",
               fontSize: "11px",
@@ -775,12 +813,21 @@ const ChartSection = ({
               gap: "4px",
             }}
           >
+            <div>Highest language shown as 100%</div>
             <span style={{ fontStyle: "italic" }}>
-              Updated: {currentDateTime} • {currentUser}
+              Updated: {new Date("2025-04-08 14:14:30").toLocaleString("en-US", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              })} • {currentUser || "b6428259"}
             </span>
           </div>
         </ChartContainer>
       )}
+
       {/* Request Locations chart - improved */}
       {visibleCharts.requestLocations && (
         <ChartContainer title="Translator Request Locations">

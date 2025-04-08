@@ -13,7 +13,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { exportToExcel } from './ExcelService';
-import { PATIENT_ESCORT_TEMPLATE, formatDataByTemplate } from './ExcelTemplate';
+import { PATIENT_ESCORT_TEMPLATE, formatDataByTemplate, COORDINATOR_TEMPLATE } from './ExcelTemplate';
 import './ExportModal.css';
 
 const ExportModal = ({ open, handleClose, exportData, title = "Export Data" }) => {
@@ -30,22 +30,22 @@ const ExportModal = ({ open, handleClose, exportData, title = "Export Data" }) =
   ];
 
   const handleExport = async () => {
-    // ตรวจสอบข้อมูลวันที่
+    // Validation
     if (!startDate || !endDate) {
       setError("กรุณาเลือกวันที่เริ่มต้นและวันที่สิ้นสุด");
       return;
     }
-
+  
     if (endDate.isBefore(startDate)) {
       setError("วันที่สิ้นสุดต้องมาหลังวันที่เริ่มต้น");
       return;
     }
-
+  
     setIsLoading(true);
     setError(null);
-
+  
     try {
-      // ดึงข้อมูลตามช่วงวันที่
+      // Get data for selected date range
       const data = await exportData(startDate, endDate);
       
       if (!data || data.length === 0) {
@@ -53,31 +53,37 @@ const ExportModal = ({ open, handleClose, exportData, title = "Export Data" }) =
         setIsLoading(false);
         return;
       }
-
-      // เตรียมข้อมูลสำหรับการส่งออก
+  
+      // Format dates for filenames
       const formattedStartDate = startDate.format('YYYY-MM-DD');
       const formattedEndDate = endDate.format('YYYY-MM-DD');
       
-      // เลือกเทมเพลตและสร้างไฟล์
+      // Determine which template to use based on the title
+      const isCoordinatorExport = title.includes("Coordinator");
+      const template = isCoordinatorExport ? COORDINATOR_TEMPLATE : PATIENT_ESCORT_TEMPLATE;
+      const reportPrefix = isCoordinatorExport ? "Coordinator" : "Patient_Escort";
+      
       if (exportType === 'full') {
-        // รายงานแบบละเอียด
+        // Detailed report
         exportToExcel(data, {
-          title: PATIENT_ESCORT_TEMPLATE.title,
+          title: template.title,
           startDate: formattedStartDate,
           endDate: formattedEndDate,
-          sheetName: PATIENT_ESCORT_TEMPLATE.sheetName,
-          fileName: `Patient_Escort_Detailed_${formattedStartDate}_to_${formattedEndDate}.xlsx`
+          sheetName: template.sheetName,
+          fileName: `${reportPrefix}_Detailed_${formattedStartDate}_to_${formattedEndDate}.xlsx`,
+          template: template // Pass the template to exportToExcel if needed
         });
       } else {
-        // รายงานสรุป - ใช้เทมเพลตที่แตกต่าง
-        const formattedData = formatDataByTemplate(data, PATIENT_ESCORT_TEMPLATE);
+        // Summary report
+        const formattedData = formatDataByTemplate(data, template);
         
         exportToExcel(formattedData, {
-          title: "PATIENT ESCORT SERVICE - SUMMARY REPORT",
+          title: `${template.title} - SUMMARY REPORT`,
           startDate: formattedStartDate,
           endDate: formattedEndDate,
           sheetName: "Summary",
-          fileName: `Patient_Escort_Summary_${formattedStartDate}_to_${formattedEndDate}.xlsx`
+          fileName: `${reportPrefix}_Summary_${formattedStartDate}_to_${formattedEndDate}.xlsx`,
+          template: template // Pass the template to exportToExcel if needed
         });
       }
       

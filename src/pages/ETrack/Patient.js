@@ -1191,34 +1191,86 @@ const Patient = () => {
       </div>
 
       {currentUserRole !== "patient_escort" && (
-        <div className="dashboard">
-          <div className="card">
-            <h3>Pending Requests</h3>
-            <div className="metric" id="pendingRequests">
-              {pendingRequests}
-            </div>
-          </div>
+  <div className="dashboard">
+    <div className="card">
+      <h3>Pending Requests</h3>
+      <div className="metric" id="pendingRequests">
+        {
+          filterRequestsByDate(requests, selectedDate).filter(
+            (r) => r.status === "pending" || r.status === "created"
+          ).length
+        }
+      </div>
+    </div>
 
-          <div className="card">
-            <h3>Completed</h3>
-            <div className="metric">{completedRequests}</div>
-          </div>
+    <div className="card">
+      <h3>Completed</h3>
+      <div className="metric">
+        {
+          filterRequestsByDate(requests, selectedDate).filter(
+            (r) => r.status === "finished"
+          ).length
+        }
+      </div>
+    </div>
 
-          <div className="card">
-            <h3>Success Rate</h3>
-            <div className="metric" id="-">
-              {parseFloat(completionRate).toFixed(2)}%
-            </div>
-          </div>
+    <div className="card">
+      <h3>Success Rate</h3>
+      <div className="metric" id="-">
+        {
+          (() => {
+            const filteredRequests = filterRequestsByDate(requests, selectedDate);
+            const filtered_completedRequests = filteredRequests.filter(
+              (r) => r.status === "finished"
+            ).length;
+            const filtered_totalRequests = filteredRequests.length;
+            const filtered_completionRate =
+              filtered_totalRequests > 0
+                ? Math.round((filtered_completedRequests / filtered_totalRequests) * 100)
+                : 0;
+            return parseFloat(filtered_completionRate).toFixed(2) + '%';
+          })()
+        }
+      </div>
+    </div>
 
-          <div className="card">
-            <h3>Avg. Handling Time</h3>
-            <div className="metric" id="patientEscortAvgResponseTime">
-              {calculateAvgHandlingTime()}
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="card">
+      <h3>Avg. Handling Time</h3>
+      <div className="metric" id="patientEscortAvgResponseTime">
+        {(() => {
+          const filteredRequests = filterRequestsByDate(requests, selectedDate);
+          
+          if (filteredRequests.length === 0) return "- mins";
+
+          let totalMinutes = 0;
+          let countableRequests = 0;
+
+          filteredRequests.forEach((request) => {
+            if (request.request_time && request.request_date) {
+              totalMinutes += calculateHandlingTimeInMinutes(
+                request.request_time,
+                request.request_date,
+                request.last_finish
+              );
+              countableRequests++;
+            }
+          });
+
+          if (countableRequests === 0) return "- mins";
+          const avgMinutes = Math.round(totalMinutes / countableRequests);
+          const hours = Math.floor(avgMinutes / 60);
+          const minutes = avgMinutes % 60;
+
+          if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+          } else {
+            return `${avgMinutes} mins`;
+          }
+        })()}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* ตาราง My Requests */}
       <div className="request-panel">

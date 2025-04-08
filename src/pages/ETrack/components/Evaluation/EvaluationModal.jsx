@@ -363,7 +363,7 @@ const validateFormData = (data) => {
   
   return (
     <div
-      className={`modal fade ${open ? "show d-block" : ""}`}
+      className={`modal fade ${open ? "show d-block" : "d-none"}`}
       tabIndex="-1"
       aria-hidden={!open}
     >
@@ -486,7 +486,7 @@ const EvaluationResultsModal = ({ open, handleClose, evaluationData }) => {
 
   return (
     <div
-      className={`modal fade ${open ? "show d-block" : ""}`}
+      className={`modal fade ${open ? "show d-block" : "d-none"}`}
       tabIndex="-1"
       aria-hidden={!open}
     >

@@ -12,8 +12,10 @@ const Notification = ({ onNotificationsViewed }) => {
   
   // Get user role from localStorage
   const currentUserRole = localStorage.getItem("empType");
-  const isAdmin = currentUserRole === "manager" || currentUserRole === "admin";
+  const isAdmin = currentUserRole === "manager" || currentUserRole === "admin" || currentUserRole === "user";
 
+
+  console.log(`User role: ${currentUserRole}`);
   // Force "all" view mode for admin and manager roles
   const [viewMode, setViewMode] = useState(isAdmin ? "all" : "personal");
 

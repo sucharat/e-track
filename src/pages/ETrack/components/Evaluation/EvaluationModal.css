@@ -1,3 +1,12 @@
+
+.modal {
+  display: none;
+}
+
+.modal.d-none {
+  display: none !important;
+}
+
 /* Modern Modal Styles */
 .modal.show {
   display: block;
@@ -13,6 +22,7 @@
   outline: 0;
   backdrop-filter: blur(3px);
   transition: all 0.3s ease-in-out;
+
 }
 
 .modal-dialog {

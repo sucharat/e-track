@@ -5,6 +5,14 @@ import {
   EvaluationModal,
   EvaluationResultsModal,
 } from "./components/Evaluation/EvaluationModal";
+import ExportModal from "./components/Patient/ExportsModal";
+// First, let's add the necessary imports at the top of the file (add these with the other imports):
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+import dayjs from "dayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 const IntCoordTab = () => {
   const [open, setOpen] = useState(false);
@@ -27,6 +35,34 @@ const IntCoordTab = () => {
   const [SYSTEM_DATETIME, setSYSTEM_DATETIME] = useState(
     new Date().toISOString().slice(0, 19).replace("T", " ")
   );
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(dayjs());
+
+  // Add this useEffect to update the date every minute if viewing today
+  useEffect(() => {
+    const dateTimer = setInterval(() => {
+      if (
+        selectedDate &&
+        dayjs().format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
+      ) {
+        setSelectedDate(dayjs());
+      }
+    }, 60000);
+    return () => clearInterval(dateTimer);
+  }, [selectedDate]);
+
+  const filterRequestsByDate = useCallback((requests, filterDate) => {
+    if (!filterDate) return requests;
+    
+    const dateString = filterDate.format("YYYY-MM-DD");
+    console.log("Filtering for date:", dateString);
+    
+    return requests.filter((request) => {
+      const matches = request.request_date === dateString;
+      if (matches) console.log("Found match:", request);
+      return matches;
+    });
+  }, []);
 
   const storedEmpType = localStorage.getItem("empType");
   const fetchTranslatorOptions = useCallback(async () => {
@@ -82,6 +118,81 @@ const IntCoordTab = () => {
       console.error("Error fetching translator options:", error);
     }
   }, []);
+
+  const handleExportData = async (startDate, endDate) => {
+    try {
+      // setIsLoading(true); // If you have a loading state in IntCoordTab
+      const token = getLocalData("token");
+
+      // Format dates for API
+      const formattedStartDate = startDate.format("YYYY-MM-DD");
+      const formattedEndDate = endDate.format("YYYY-MM-DD");
+
+      console.log(
+        `Fetching data from ${formattedStartDate} to ${formattedEndDate}`
+      );
+
+      // Fetch the translator request data
+      const response = await fetch(
+        `${url}/api/ETrack/OnGetEtrackRequest?Type=translator`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: "Bearer " + token,
+          },
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data: ${response.status}`);
+      }
+
+      // Process the response data
+      const result = await response.json();
+      let data = [];
+
+      if (Array.isArray(result)) {
+        data = result;
+      } else if (typeof result === "string") {
+        try {
+          const parsed = JSON.parse(result);
+          data = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.error("Error parsing JSON string:", e);
+          data = [];
+        }
+      } else if (result && typeof result === "object") {
+        data = [result];
+      }
+
+      // Filter by date
+      const filteredData = data.filter((item) => {
+        const requestDate = item.request_date;
+        return (
+          requestDate >= formattedStartDate && requestDate <= formattedEndDate
+        );
+      });
+
+      console.log(`Filtered data count: ${filteredData.length}`);
+
+      // If the current user is a translator, filter the data accordingly
+      if (storedEmpType === "translator" && SYSTEM_USER_ID) {
+        return filteredData.filter(
+          (request) => request.staff_id === SYSTEM_USER_ID
+        );
+      }
+
+      return filteredData;
+    } catch (error) {
+      console.error("Error fetching export data:", error);
+      throw error;
+    } finally {
+      // setIsLoading(false); // If you have a loading state in IntCoordTab
+    }
+  };
 
   const fetchDepartmentTrackerData = useCallback(async () => {
     try {
@@ -152,7 +263,7 @@ const IntCoordTab = () => {
     }
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     fetchRequests();
     fetchTranslatorOptions();
     fetchDepartmentTrackerData();
@@ -176,7 +287,6 @@ useEffect(() => {
   }, []);
 
   const handleSubmitEvaluation = async (requestId, formData) => {
-
     console.log("Form Data for Evaluation:", formData);
     console.log("Request ID for Evaluation:", requestId);
     if (!requestId) {
@@ -187,26 +297,76 @@ useEffect(() => {
     try {
       const result = await submitEvaluation(requestId, formData);
       console.log("Evaluation submitted successfully");
-      setEvaluationModalOpen(false);  fetchRequestsData();
+      setEvaluationModalOpen(false);
+      fetchRequestsData();
       return result;
     } catch (error) {
       throw error;
     }
   };
 
+  // Add this function to update dashboard metrics with filtered data
+const updateDashboardMetricsWithFilteredData = () => {
+  const filteredRequests = filterRequestsByDate(requests, selectedDate);
+  
+  const pendingRequests = filteredRequests.filter(
+    (req) => req.status.toLowerCase() === "pending" || 
+             req.status.toLowerCase() === "created"
+  ).length;
+
+  const completedRequests = filteredRequests.filter(
+    (req) => req.status.toLowerCase() === "finished" || 
+             req.status.toLowerCase() === "completed"
+  ).length;
+
+  const completionRate = filteredRequests.length > 0
+    ? Math.round((completedRequests / filteredRequests.length) * 100)
+    : 0;
+
+  // Calculate average handling time
+  const avgTimeText = calculateAverageHandlingTime(filteredRequests);
+
+  // Update UI
+  const pendingElement = document.getElementById("coordPendingRequests");
+  const completedElement = document.getElementById("coordCompletedRequests");
+  const completionRateElement = document.getElementById("coordCompletionRate");
+  const avgTimeElement = document.getElementById("coordAvgResponseTime");
+
+  if (pendingElement) pendingElement.textContent = pendingRequests;
+  if (completedElement) completedElement.textContent = completedRequests;
+  if (completionRateElement) completionRateElement.textContent = `${completionRate}%`;
+  if (avgTimeElement) avgTimeElement.textContent = avgTimeText;
+};
+
+// Add this useEffect to update metrics when data or selected date changes
+useEffect(() => {
+  updateDashboardMetricsWithFilteredData();
+}, [requests, selectedDate]);
+
+// Add this function to ensure consistent date formats
+const normalizeDate = (dateString) => {
+  if (!dateString) return "";
+  // Convert any date format to YYYY-MM-DD
+  return dayjs(dateString).format("YYYY-MM-DD");
+};
+
   const submitEvaluation = async (requestId, evaluationData) => {
     try {
       const token = getLocalData("token");
       let employeeId = evaluationData.employee_id;
       if (!employeeId) {
-        const request = requests.find(r => r.id === requestId || r.request_id === requestId);
+        const request = requests.find(
+          (r) => r.id === requestId || r.request_id === requestId
+        );
         if (request && request.staff_id) {
           employeeId = request.staff_id;
         } else {
-          const matchingRequest = requests.find(r => r.id === requestId || r.request_id === requestId);
+          const matchingRequest = requests.find(
+            (r) => r.id === requestId || r.request_id === requestId
+          );
           if (matchingRequest) {
             const matchingTranslator = translatorOptions.find(
-              t => t.full_name === matchingRequest.coordinatorName
+              (t) => t.full_name === matchingRequest.coordinatorName
             );
             if (matchingTranslator) {
               employeeId = matchingTranslator.eid;
@@ -215,8 +375,11 @@ useEffect(() => {
         }
       }
       if (!employeeId) {
-        throw new Error("ไม่พบรหัสพนักงานสำหรับการประเมิน กรุณาระบุ employee_id ในข้อมูลประเมิน"); }
-  
+        throw new Error(
+          "ไม่พบรหัสพนักงานสำหรับการประเมิน กรุณาระบุ employee_id ในข้อมูลประเมิน"
+        );
+      }
+
       const evaluationPayload = {
         evaluator_id: SYSTEM_USER_ID,
         employee_id: employeeId,
@@ -228,14 +391,18 @@ useEffect(() => {
         request_id: requestId,
         details: evaluationData.details.map((detail) => ({
           criteria_id: detail.criteria_id,
-          criteria_name: detail.criteria_name || `เกณฑ์ที่ ${detail.criteria_id}`,
+          criteria_name:
+            detail.criteria_name || `เกณฑ์ที่ ${detail.criteria_id}`,
           score: detail.score,
           comments: detail.comments || "",
         })),
       };
-  
-      console.log("Submitting evaluation payload:", JSON.stringify(evaluationPayload));
-  
+
+      console.log(
+        "Submitting evaluation payload:",
+        JSON.stringify(evaluationPayload)
+      );
+
       const evalResponse = await fetch(
         `${url}/api/Evaluation/OnCreateEvaluation`,
         {
@@ -244,22 +411,25 @@ useEffect(() => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(evaluationPayload),  }
+          body: JSON.stringify(evaluationPayload),
+        }
       );
-  
+
       if (!evalResponse.ok) {
         let errorMessage = `Failed to submit evaluation (${evalResponse.status})`;
         try {
           const errorResponse = await evalResponse.json();
-          errorMessage = errorResponse.message || errorResponse.title || errorMessage;
+          errorMessage =
+            errorResponse.message || errorResponse.title || errorMessage;
           console.error("API error details:", errorResponse);
         } catch (e) {
           console.error("Error parsing error response:", e);
         }
-        throw new Error(errorMessage); }
-  
+        throw new Error(errorMessage);
+      }
+
       const result = await evalResponse.json();
-      // อัปเดตสถานะ request 
+      // อัปเดตสถานะ request
       await updateRequestStatus(requestId, "evaluated");
       await fetchRequestsData();
       return result;
@@ -289,7 +459,8 @@ useEffect(() => {
       console.log(`API response status: ${response.status}`);
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch evaluation data: ${response.status}`); }
+        throw new Error(`Failed to fetch evaluation data: ${response.status}`);
+      }
       const responseData = await response.json();
       console.log("API response data:", responseData);
 
@@ -299,7 +470,7 @@ useEffect(() => {
         requestId: requestId,
       };
 
-    setEvaluationData(evaluationResult);
+      setEvaluationData(evaluationResult);
       return evaluationResult;
     } catch (error) {
       console.error("Error fetching evaluation results:", error);
@@ -315,12 +486,14 @@ useEffect(() => {
   const updateDepartment = async (id) => {
     if (!id || !newDepartments[id]) {
       alert("Please select a department");
-      return; }
+      return;
+    }
     const confirmUpdate = window.confirm(
       "Are you sure you want to update the department?"
     );
     if (!confirmUpdate) {
-      return; }
+      return;
+    }
 
     try {
       setMovingDepartmentId(id);
@@ -342,7 +515,7 @@ useEffect(() => {
       );
 
       if (response.ok) {
-      setDepartmentTrackers((prev) =>
+        setDepartmentTrackers((prev) =>
           prev.map((tracker) =>
             tracker.id === id
               ? {
@@ -365,7 +538,7 @@ useEffect(() => {
         });
 
         alert("Department updated successfully");
-      fetchDepartmentTrackerData();
+        fetchDepartmentTrackerData();
       } else {
         alert("Failed to update department");
       }
@@ -377,7 +550,6 @@ useEffect(() => {
     }
   };
 
- 
   const updateTranslatorAvailability = useCallback(
     (requestsData) => {
       if (translatorOptions.length > 0) {
@@ -497,17 +669,17 @@ useEffect(() => {
             Accept: "application/json",
             Authorization: "Bearer " + token,
           },
-          cache: 'no-store'
+          cache: "no-store",
         }
       );
-  
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-  
+
       const result = await response.json();
       let dataArray = [];
-      
+
       if (Array.isArray(result)) {
         dataArray = result;
       } else if (typeof result === "string") {
@@ -521,7 +693,7 @@ useEffect(() => {
       } else if (result && typeof result === "object") {
         dataArray = [result];
       }
-  
+
       // Transform data
       const transformedData = dataArray.map((item) => ({
         id: item.request_id,
@@ -539,13 +711,13 @@ useEffect(() => {
         staff_id: item.staff_id,
         last_finish: item.last_finish,
       }));
-  
+
       // Filter requests if current user is a translator
       const currentUserRole = localStorage.getItem("empType");
       if (currentUserRole === "translator" && SYSTEM_USER_ID) {
         // Filter requests to only show those assigned to the current translator
-        const filteredRequests = transformedData.filter(request => 
-          request.staff_id === SYSTEM_USER_ID
+        const filteredRequests = transformedData.filter(
+          (request) => request.staff_id === SYSTEM_USER_ID
         );
         setRequests(filteredRequests);
         updateDashboardMetrics(filteredRequests);
@@ -563,91 +735,99 @@ useEffect(() => {
     }
   }, [updateTranslatorAvailability]);
 
-const calculateHandlingTime = (requestTimeStr, requestDateStr, lastFinishStr) => {
-  if (!requestTimeStr || !requestDateStr) return "-";
-  try {
-    const [year, month, day] = requestDateStr.split("-").map(Number);
-    const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
+  const calculateHandlingTime = (
+    requestTimeStr,
+    requestDateStr,
+    lastFinishStr
+  ) => {
+    if (!requestTimeStr || !requestDateStr) return "-";
+    try {
+      const [year, month, day] = requestDateStr.split("-").map(Number);
+      const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
 
-    const requestDateTime = new Date(
-      year,
-      month - 1,
-      day,
-      hours,
-      minutes,
-      seconds
-    );
+      const requestDateTime = new Date(
+        year,
+        month - 1,
+        day,
+        hours,
+        minutes,
+        seconds
+      );
 
-    let endDateTime;
-    if (lastFinishStr) {
-      endDateTime = new Date(lastFinishStr.replace(" ", "T"));
-    } else {
-      endDateTime = new Date();
+      let endDateTime;
+      if (lastFinishStr) {
+        endDateTime = new Date(lastFinishStr.replace(" ", "T"));
+      } else {
+        endDateTime = new Date();
+      }
+      const diffMs = endDateTime - requestDateTime;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMinutes / 60);
+      const remainingMinutes = diffMinutes % 60;
+
+      if (diffHours > 0) {
+        return `${diffHours}h ${remainingMinutes}m`;
+      } else {
+        return `${diffMinutes}m`;
+      }
+    } catch (error) {
+      console.error("Error calculating handling time:", error);
+      return "-";
     }
-    const diffMs = endDateTime - requestDateTime;
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMinutes / 60);
-    const remainingMinutes = diffMinutes % 60;
+  };
 
-    if (diffHours > 0) {
-      return `${diffHours}h ${remainingMinutes}m`;
-    } else {
-      return `${diffMinutes}m`;
+  const calculateHandlingTimeInMinutes = (
+    requestTimeStr,
+    requestDateStr,
+    lastFinishStr
+  ) => {
+    if (!requestTimeStr || !requestDateStr) return 0;
+    try {
+      const [year, month, day] = requestDateStr.split("-").map(Number);
+      const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
+      const requestDateTime = new Date(
+        year,
+        month - 1,
+        day,
+        hours,
+        minutes,
+        seconds
+      );
+
+      let endDateTime;
+      if (lastFinishStr) {
+        endDateTime = new Date(lastFinishStr.replace(" ", "T"));
+      } else {
+        endDateTime = new Date();
+      }
+
+      const diffMs = endDateTime - requestDateTime;
+      return Math.floor(diffMs / (1000 * 60));
+    } catch (error) {
+      console.error("Error calculating handling time in minutes:", error);
+      return 0;
     }
-  } catch (error) {
-    console.error("Error calculating handling time:", error);
-    return "-";
-  }
-};
-
-const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFinishStr) => {
-  if (!requestTimeStr || !requestDateStr) return 0;
-  try {
-    const [year, month, day] = requestDateStr.split("-").map(Number);
-    const [hours, minutes, seconds] = requestTimeStr.split(":").map(Number);
-    const requestDateTime = new Date(
-      year,
-      month - 1,
-      day,
-      hours,
-      minutes,
-      seconds
-    );
-
-    let endDateTime;
-    if (lastFinishStr) {
-      endDateTime = new Date(lastFinishStr.replace(" ", "T"));
-    } else {
-      endDateTime = new Date();
-    }
-
-    const diffMs = endDateTime - requestDateTime;
-    return Math.floor(diffMs / (1000 * 60));
-  } catch (error) {
-    console.error("Error calculating handling time in minutes:", error);
-    return 0;
-  }
-};
+  };
   const updateDashboardMetrics = (requestsData) => {
     const pendingRequests = requestsData.filter(
       (req) =>
         req.status.toLowerCase() === "pending" ||
         req.status.toLowerCase() === "created"
     ).length;
-    
+
     const completedRequests = requestsData.filter(
       (req) =>
         req.status.toLowerCase() === "finished" ||
         req.status.toLowerCase() === "completed"
     ).length;
-    
+
     const completionRate =
       requestsData.length > 0
         ? Math.round((completedRequests / requestsData.length) * 100)
         : 0;
     let totalMinutes = 0;
     let countableRequests = 0;
-  
+
     requestsData.forEach((request) => {
       if (request.request_time && request.request_date) {
         totalMinutes += calculateHandlingTimeInMinutes(
@@ -658,13 +838,13 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
         countableRequests++;
       }
     });
-  
+
     let avgTimeText = "0 mins";
     if (countableRequests > 0) {
       const avgMinutes = Math.round(totalMinutes / countableRequests);
       const hours = Math.floor(avgMinutes / 60);
       const minutes = avgMinutes % 60;
-  
+
       if (hours > 0) {
         avgTimeText = `${hours}h ${minutes}m`;
       } else {
@@ -673,15 +853,16 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
     }
     const pendingElement = document.getElementById("coordPendingRequests");
     const completedElement = document.getElementById("coordCompletedRequests");
-    const completionRateElement = document.getElementById("coordCompletionRate");
+    const completionRateElement = document.getElementById(
+      "coordCompletionRate"
+    );
     const avgTimeElement = document.getElementById("coordAvgResponseTime");
-  
+
     if (pendingElement) pendingElement.textContent = pendingRequests;
     if (completedElement) completedElement.textContent = completedRequests;
     if (completionRateElement)
       completionRateElement.textContent = `${completionRate}%`;
-    if (avgTimeElement)
-      avgTimeElement.textContent = avgTimeText;
+    if (avgTimeElement) avgTimeElement.textContent = avgTimeText;
   };
 
   const handleSubmit = async (event, formData) => {
@@ -879,18 +1060,18 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
   const renderActionButtons = (request) => {
     const isProcessing = processingId === request.id;
     const status = (request.status || "").toLowerCase();
-  
+
     const userRole = localStorage.getItem("empType");
     const isManagerOrAdmin =
       userRole === "manager" ||
       userRole === "admin" ||
       userRole === "manager_translator";
-  
+
     const isPending = status === "pending" || status === "created";
     const isAccepted = status === "accepted";
     const isFinished = status === "finished" || status === "completed";
     const isEvaluated = status === "evaluated";
-  
+
     return (
       <div className="action-buttons">
         {!isEvaluated && !isFinished && (
@@ -923,20 +1104,23 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
             {isProcessing ? "กำลังประมวลผล..." : "Finish"}
           </button>
         )}
-  
+
         {isManagerOrAdmin && isFinished && !isEvaluated && (
           <button
             className="btn btn-info btn-sm"
             onClick={() => {
               // ค้นหาข้อมูล translator
               const selectedTranslator = translatorOptions.find(
-                (t) => t.full_name === request.coordinatorName );
+                (t) => t.full_name === request.coordinatorName
+              );
               const completeRequest = {
                 ...request,
                 request_id: request.request_id || request.id,
-                staff_id: selectedTranslator ? selectedTranslator.eid : request.staff_id || "",
+                staff_id: selectedTranslator
+                  ? selectedTranslator.eid
+                  : request.staff_id || "",
               };
-  
+
               setSelectedRequestForEvaluation(completeRequest);
               setEvaluationModalOpen(true);
             }}
@@ -946,14 +1130,16 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
             {isProcessing ? "กำลังประมวลผล..." : "Evaluate Staff"}
           </button>
         )}
-  
+
         {isManagerOrAdmin && isEvaluated && (
           <button
             className="btn btn-secondary btn-sm"
             onClick={async () => {
               try {
                 const requestIdForEvaluation = request.request_id || request.id;
-                const results = await getEvaluationResults(requestIdForEvaluation);
+                const results = await getEvaluationResults(
+                  requestIdForEvaluation
+                );
                 setEvaluationData(results);
                 setEvaluationResultsModalOpen(true);
               } catch (error) {
@@ -1024,11 +1210,12 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
                           onClick={() => updateDepartment(tracker.id)}
                           disabled={
                             movingDepartmentId === tracker.id ||
-                            !newDepartments[tracker.id] }
+                            !newDepartments[tracker.id]
+                          }
                         >
                           {movingDepartmentId === tracker.id
                             ? "Processing..."
-                            : "Move Dept" }
+                            : "Move Dept"}
                         </button>
                       </div>
                     </td>
@@ -1051,14 +1238,42 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
   const currentDateTime = "2025-03-06 07:37:37";
   const currentLoginId = localStorage.getItem("fullName");
 
+  const calculateAverageHandlingTime = useCallback((filteredRequests) => {
+    if (filteredRequests.length === 0) return "0 mins";
+  
+    let totalMinutes = 0;
+    let countableRequests = 0;
+  
+    filteredRequests.forEach((request) => {
+      if (request.request_time && request.request_date) {
+        totalMinutes += calculateHandlingTimeInMinutes(
+          request.request_time,
+          request.request_date,
+          request.last_finish
+        );
+        countableRequests++;
+      }
+    });
+  
+    if (countableRequests === 0) return "0 mins";
+    const avgMinutes = Math.round(totalMinutes / countableRequests);
+    const hours = Math.floor(avgMinutes / 60);
+    const minutes = avgMinutes % 60;
+  
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${avgMinutes} mins`;
+    }
+  }, [calculateHandlingTimeInMinutes]);
+
   return (
     <div id="intCoordSection">
       <div className="header">
         <div className="title">
           E-TRACK | International Coordinator Requests
         </div>
-
-        <div>
+      <div>
           {(storedEmpType === "manager" ||
             storedEmpType === "manager_translator" ||
             storedEmpType === "user") && (
@@ -1078,156 +1293,210 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
           {(storedEmpType === "manager" ||
             storedEmpType === "manager_translator" ||
             storedEmpType === "user") && (
-            <button className="btn btn-export">Export Coordinator Data</button>
+            <button
+              className="btn btn-export"
+              onClick={() => setExportModalOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
+                color: "white",
+                boxShadow: "0 3px 5px 2px rgba(33, 203, 243, .3)",
+              }}
+            >
+              <i className="fas fa-file-export"></i>
+              Export Coordinator Data
+            </button>
           )}
-          <button
-            className="btn btn-refresh"
-            onClick={() => {
-              fetchRequestsData();
-              fetchTranslatorOptions();
-            }}
-            disabled={loading}
-          >
-            {loading ? "Loading..." : "Refresh Data"}
-          </button>
         </div>
       </div>
 
-      {/* แสดง Dashboard เฉพาะกรณีที่ไม่ใช่ translator */}
-      {storedEmpType !== "translator" && (
-        <div className="dashboard">
-          <div className="card">
-            <h3>Pending Coord Requests</h3>
-            <div className="metric" id="coordPendingRequests">
-              {
-                requests.filter(
-                  (req) =>
-                    req.status.toLowerCase() === "pending" ||
-                    req.status.toLowerCase() === "created"
-                ).length
-              }
-            </div>
-          </div>
+    {/* แสดง Dashboard เฉพาะกรณีที่ไม่ใช่ translator */}
+{storedEmpType !== "translator" && (
+  <div className="dashboard">
+    <div className="card">
+      <h3>Pending Coord Requests</h3>
+      <div className="metric" id="coordPendingRequests">
+        {
+          filterRequestsByDate(requests, selectedDate).filter(
+            (req) =>
+              req.status.toLowerCase() === "pending" ||
+              req.status.toLowerCase() === "created"
+          ).length
+        }
+      </div>
+    </div>
 
-          <div className="card">
-            <h4>Completed </h4>
-            <div className="metric" id="coordCompletedRequests">
-              {
-                requests.filter(
-                  (req) =>
-                    req.status.toLowerCase() === "finished" ||
-                    req.status.toLowerCase() === "completed"
-                ).length
-              }
-            </div>
-          </div>
+    <div className="card">
+      <h4>Completed </h4>
+      <div className="metric" id="coordCompletedRequests">
+        {
+          filterRequestsByDate(requests, selectedDate).filter(
+            (req) =>
+              req.status.toLowerCase() === "finished" ||
+              req.status.toLowerCase() === "completed"
+          ).length
+        }
+      </div>
+    </div>
 
-          <div className="card">
-            <h3>Success Rate</h3>
-            <div className="metric" id="-">
-              {requests.length > 0
-                ? (
-                    (requests.filter((req) =>
-                      ["finished", "completed"].includes(
-                        req.status.toLowerCase()
-                      )
-                    ).length /
-                      requests.length) *
-                    100
-                  ).toFixed(2) + "%"
-                : "0%"}
-            </div>
-          </div>
+    <div className="card">
+      <h3>Success Rate</h3>
+      <div className="metric" id="-">
+        {(() => {
+          const filteredRequests = filterRequestsByDate(requests, selectedDate);
+          return filteredRequests.length > 0
+            ? (
+                (filteredRequests.filter((req) =>
+                  ["finished", "completed"].includes(
+                    req.status.toLowerCase()
+                  )
+                ).length /
+                  filteredRequests.length) *
+                100
+              ).toFixed(2) + "%"
+            : "0%";
+        })()}
+      </div>
+    </div>
 
-          <div className="card">
-            <h3>Avg. Handling Time</h3>
-            <div className="metric" id="coordAvgResponseTime">
-              0 mins
-            </div>
-          </div>
+    <div className="card">
+      <h3>Avg. Handling Time</h3>
+      <div className="metric" id="coordAvgResponseTime">
+        {(() => {
+          const filteredRequests = filterRequestsByDate(requests, selectedDate);
+          if (filteredRequests.length === 0) return "0 mins";
+          
+          let totalMinutes = 0;
+          let countableRequests = 0;
+          
+          filteredRequests.forEach((request) => {
+            if (request.request_time && request.request_date) {
+              totalMinutes += calculateHandlingTimeInMinutes(
+                request.request_time,
+                request.request_date,
+                request.last_finish
+              );
+              countableRequests++;
+            }
+          });
+          
+          if (countableRequests === 0) return "0 mins";
+          
+          const avgMinutes = Math.round(totalMinutes / countableRequests);
+          const hours = Math.floor(avgMinutes / 60);
+          const minutes = avgMinutes % 60;
+          
+          if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+          } else {
+            return `${avgMinutes} mins`;
+          }
+        })()}
+      </div>
+    </div>
+  </div>
+)}
+      <div className="request-panel">
+        <div className="request-header">
+          <h2>International Coordinator's Requests</h2>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <DatePicker
+                label="Filter by date"
+                value={selectedDate}
+                onChange={(newDate) => setSelectedDate(newDate)}
+                slotProps={{
+                  textField: {
+                    size: "small",
+                    sx: { width: "200px" },
+                  },
+                }}
+              />
+            </Box>
+          </LocalizationProvider>
         </div>
-      )}
 
-<div className="request-panel">
-  <h2>International Coordinator's Requests</h2>
-  {loading ? (
-    <div className="loading-container">
-      <p>กำลังโหลดข้อมูล...</p>
-      <div className="loading-spinner"></div>
-    </div>
-  ) : (
-    <div className="table-responsive">
-      <table className="tracking-table">
-            <thead>
-              <tr>
-                <th>Coord Req. ID</th>
-                <th>Coordinator Name</th>
-                <th>Language</th>
-                <th>Extension</th>
-                <th>Department</th>
-                <th>Urgency</th>
-                <th>Handling Time</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+        {loading ? (
+          <div className="loading-container">
+            <p>กำลังโหลดข้อมูล...</p>
+            <div className="loading-spinner"></div>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="tracking-table">
+              <thead>
+                <tr>
+                  <th>Coord Req. ID</th>
+                  <th>Coordinator Name</th>
+                  <th>Language</th>
+                  <th>Extension</th>
+                  <th>Department</th>
+                  <th>Urgency</th>
+                  <th>Handling Time</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
 
-            <tbody>
-  {requests.length > 0 ? (
-    // Add sorting here, before mapping over the requests
-    [...requests]
-      .sort((a, b) => b.id - a.id)
-      .map((request) => (
-        <tr key={request.id}>
-          <td>{request.id}</td>
-          <td>{request.coordinatorName}</td>
-          <td>{request.language}</td>
-          <td>{request.extension}</td>
-          <td>{request.department}</td>
-          <td>{request.urgency}</td>
-          <td>
-            {calculateHandlingTime(
-              request.request_time,
-              request.request_date,
-              request.last_finish
-            )}
-          </td>
-          <td>
-            <span
-              className={`status-indicator ${
-                request.status?.toLowerCase() === "evaluated"
-                  ? "evaluated"
-                  : request.status?.toLowerCase() === "finished" ||
-                    request.status?.toLowerCase() === "completed"
-                  ? "completed"
-                  : request.status?.toLowerCase() === "accepted"
-                  ? "accepted"
-                  : "pending"
-              }`}
-            >
-              {request.status || "pending"}
-            </span>
-          </td>
-          <td>{renderActionButtons(request)}</td>
-        </tr>
-      ))
-  ) : (
-    <tr>
-      <td colSpan="9" style={{ textAlign: "center" }}>
-        ไม่พบข้อมูลคำขอ
-      </td>
-    </tr>
-  )}
-</tbody>
-      </table>
-    </div>
-  )}
-</div>
+              <tbody>
+                {requests.length > 0 ? (
+                  // Add filtering here, before mapping over the requests
+                  [...filterRequestsByDate(requests, selectedDate)]
+                    .sort((a, b) => b.id - a.id)
+                    .map((request) => (
+                      <tr key={request.id}>
+                        <td>{request.id}</td>
+                        <td>{request.coordinatorName}</td>
+                        <td>{request.language}</td>
+                        <td>{request.extension}</td>
+                        <td>{request.department}</td>
+                        <td>{request.urgency}</td>
+                        <td>
+                          {calculateHandlingTime(
+                            request.request_time,
+                            request.request_date,
+                            request.last_finish
+                          )}
+                        </td>
+                        <td>
+                          <span
+                            className={`status-indicator ${
+                              request.status?.toLowerCase() === "evaluated"
+                                ? "evaluated"
+                                : request.status?.toLowerCase() ===
+                                    "finished" ||
+                                  request.status?.toLowerCase() === "completed"
+                                ? "completed"
+                                : request.status?.toLowerCase() === "accepted"
+                                ? "accepted"
+                                : "pending"
+                            }`}
+                          >
+                            {request.status || "pending"}
+                          </span>
+                        </td>
+                        <td>{renderActionButtons(request)}</td>
+                      </tr>
+                    ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: "center" }}>
+                      ไม่พบข้อมูลคำขอ
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* แสดงส่วนนี้เฉพาะกรณีที่ไม่ใช่ translator */}
       {storedEmpType !== "translator" && (
         <>
-          <div className="request-panel">
+          {/* <div className="request-panel">
             <h2>Coordinator Directory</h2>
             <table className="tracking-table">
               <thead>
@@ -1260,21 +1529,28 @@ const calculateHandlingTimeInMinutes = (requestTimeStr, requestDateStr, lastFini
                 ))}
               </tbody>
             </table>
-          </div>
+          </div> */}
 
           {/* ตารางDepartment */}
           {/* {renderDepartmentTracker()}  */}
-         <EvaluationModal
+          <EvaluationModal
             open={evaluationModalOpen}
             handleClose={() => setEvaluationModalOpen(false)}
             request={selectedRequestForEvaluation}
             onSubmitEvaluation={handleSubmitEvaluation}
-            currentUser={SYSTEM_USER_ID} 
-         />
-        <EvaluationResultsModal
+            currentUser={SYSTEM_USER_ID}
+          />
+          <EvaluationResultsModal
             open={evaluationResultsModalOpen}
             handleClose={() => setEvaluationResultsModalOpen(false)}
             evaluationData={evaluationData}
+          />
+          {/* Add this before the closing div of your component */}
+          <ExportModal
+            open={exportModalOpen}
+            handleClose={() => setExportModalOpen(false)}
+            exportData={handleExportData}
+            title="ส่งออกข้อมูล International Coordinator"
           />
         </>
       )}

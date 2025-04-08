@@ -1,5 +1,6 @@
 import React from 'react';
 import StatsCard from "../StatsCard";
+import { Grid, Card, CardContent, Typography } from '@mui/material';
 
 const StatsDisplay = ({
   selectedDataType,
@@ -24,12 +25,38 @@ const StatsDisplay = ({
     completed: "linear-gradient(135deg, #26C6DA 0%, #00ACC1 100%)"
   };
 
+  // ฟังก์ชันสำหรับกรองข้อมูลของวันปัจจุบัน
+  const filterTodayData = (requests) => {
+    const today = new Date().toISOString().split('T')[0];
+    return requests.filter(req => req.request_date === today);
+  };
+
+  // กรองข้อมูลสำหรับวันปัจจุบัน
+  const todayRequests = filterTodayData(filteredRequests);
+  const todayCoordRequests = filterTodayData(filteredCoordRequests);
+
+  const todayPendingEscort = todayRequests.filter(
+    req => req.status?.toLowerCase() === "pending"
+  ).length;
+
+  const todayCompletedEscort = todayRequests.filter(
+    req => req.status?.toLowerCase() === "finished"
+  ).length;
+
+  const todayPendingCoord = todayCoordRequests.filter(
+    req => req.status?.toLowerCase() === "pending"
+  ).length;
+
+  const todayCompletedCoord = todayCoordRequests.filter(
+    req => req.status?.toLowerCase() === "finished"
+  ).length;
+
   if (selectedDataType === "patient_escort") {
     return (
       <div className="dashboard-summary">
         <StatsCard 
-          title="Active Escort Requests" 
-          value={filteredRequests.length} 
+          title="Active Escort Requests"
+          value={todayRequests.length} 
           type="active-requests"
           className="active-requests"
           style={{ background: escortColors.active }}
@@ -37,7 +64,7 @@ const StatsDisplay = ({
         
         <StatsCard 
           title="Pending Escort Requests" 
-          value={filteredPendingEscortCount}
+          value={todayPendingEscort}
           type="pending"
           className="pending-escorts"
           style={{ background: escortColors.pending }}
@@ -45,7 +72,7 @@ const StatsDisplay = ({
 
         <StatsCard 
           title="Completed Escort Requests" 
-          value={filteredCompletedEscortCount}
+          value={todayCompletedEscort}
           type="completed"
           className="completed-escorts"
           style={{ background: escortColors.completed }}
@@ -58,7 +85,7 @@ const StatsDisplay = ({
     <div className="dashboard-summary">
       <StatsCard 
         title="Active Translator Requests" 
-        value={filteredCoordRequests.length} 
+        value={todayCoordRequests.length} 
         type="translator"
         className="active-translators"
         style={{ background: translatorColors.active }}
@@ -66,7 +93,7 @@ const StatsDisplay = ({
       
       <StatsCard 
         title="Pending Coord Requests" 
-        value={filteredPendingCoordCount}
+        value={todayPendingCoord}
         type="pending"
         className="pending-coord"
         style={{ background: translatorColors.pending }}
@@ -74,14 +101,12 @@ const StatsDisplay = ({
       
       <StatsCard 
         title="Completed Coord Requests" 
-        value={filteredCompletedCoordCount}
+        value={todayCompletedCoord}
         type="completed"
         className="completed-coord"
         style={{ background: translatorColors.completed }}
       />
-      
-    </div>
-
+  </div>
   );
 };
 
