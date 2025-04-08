@@ -565,6 +565,8 @@ const calculateSuccessRate = (requests) => {
         visibleCharts={visibleCharts}
         setVisibleCharts={setVisibleCharts}/>
 
+
+
       <div className="dashboard-section-title">
         <h2>
           {selectedDataType === "patient_escort"

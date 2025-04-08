@@ -376,6 +376,7 @@ useEffect(() => {
       setMovingDepartmentId(null);
     }
   };
+
  
   const updateTranslatorAvailability = useCallback(
     (requestsData) => {
