@@ -2,7 +2,6 @@
   "name": "e-track",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://sucharat.github.io/e-track",
 
   "dependencies": {
     "@emotion/react": "^11.14.0",
