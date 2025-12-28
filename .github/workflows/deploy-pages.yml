@@ -1,0 +1,74 @@
+name: Deploy React App to GitHub Pages
+
+on:
+  push:
+    branches: [ "main", "master" ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Show Node / npm versions
+        run: |
+          node -v
+          npm -v
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (run and show workspace)
+        run: |
+          set -o pipefail
+          echo "Running npm run build..."
+          if ! npm run build 2>&1 | tee build.log; then
+            echo "::error::npm run build failed. See build.log."
+            ls -la || true
+            exit 1
+          fi
+          echo "Build succeeded."
+          ls -la ./build || true
+          ls -la ./dist || true
+
+      - name: Detect artifact path (build vs dist)
+        id: detect
+        run: |
+          if [ -d "./build" ]; then
+            echo "ARTIFACT_PATH=./build" >> $GITHUB_ENV
+          elif [ -d "./dist" ]; then
+            echo "ARTIFACT_PATH=./dist" >> $GITHUB_ENV
+          else
+            echo "::error::No build output found."
+            ls -la || true
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.ARTIFACT_PATH }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        
