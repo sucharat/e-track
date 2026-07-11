@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { encryptData, getLocalData } from "../helper/help";
+import { encryptData, getLocalData, url } from "../helper/help";
 import { useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Import icons for the password toggle
 
@@ -62,7 +62,7 @@ function Login() {
   
     console.log("ส่งข้อมูลไป Login API:", data);
   
-    const response = await fetch("http://localhost:5025/api/Login/Login", {
+    const response = await fetch(`${url}/api/Login/Login`, {
       method: "POST",
       body: JSON.stringify(data),
       headers: {
@@ -81,7 +81,7 @@ function Login() {
   
     localStorage.setItem(encryptData("token"), encryptData(result.Token));
 
-    const userResponse = await fetch("http://localhost:5025/api/Login/me", {
+    const userResponse = await fetch(`${url}/api/Login/me`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${result.Token}`,

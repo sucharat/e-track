@@ -1,8 +1,8 @@
 
 
 import CryptoJS from 'crypto-js';
-export const url = 'http://localhost:5025';
-//export const url = process.env.REACT_APP_API_URL;
+//export const url = 'http://localhost:5025';
+export const url = process.env.REACT_APP_API_URL || 'http://localhost:5025';
 
 export const expireInHour = '1';
 
